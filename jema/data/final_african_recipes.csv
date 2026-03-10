@@ -1,0 +1,552 @@
+country,meal_name,core_ingredients,recipes,cook_time,substitutes,meal_type,notes,cuisine_region,spices_seasoning,cook_time_minutes
+Kenya,Irio,"Potatoes, peas, maize, leafy greens","Boil potatoes, peas and maize → Add chopped greens → Mash to coarse texture → Serve warm",30,Add pumpkin leaves; replace peas with beans,Main / Side,Everyday and ceremonial food,east_africa,"salt, pepper",30.0
+Kenya,Mukimo,"Potatoes, maize, beans",Boil together → Mash until smooth but textured,35,Add greens or peas,Main,Ceremonial dish,east_africa,"salt, pepper",35.0
+Kenya,Njahi,"Black beans, water, salt",Slow-boil njahi until soft → Serve plain or lightly seasoned,90,Stew with onions,Main,Highly valued protein,east_africa,"salt, pepper",90.0
+Kenya,Njahi ya Githeri,"Black beans, maize",Boil together slowly → Serve thick and hearty,100,Fry after boiling,Main,Traditional mixed meal,east_africa,"salt, pepper",100.0
+Kenya,Gikuyu Thabai,"Sweet potatoes, arrowroots",Boil roots together → Serve,30,Add cassava,Main,Traditional root meal,east_africa,"salt, pepper",30.0
+Kenya,Mirore,Pumpkin leaves,Boil → Light fry,20,Cowpea leaves,Side,Indigenous vegetable,east_africa,"salt, pepper",20.0
+Kenya,Thaka,Spider plant,Boil to reduce bitterness → Fry lightly,20,Add groundnuts,Side,Medicinal green,east_africa,"salt, pepper",20.0
+Kenya,Kienyeji Chicken Stew,"Indigenous chicken, onion",Slow-cook chicken until tender,120,Goat meat,Main,Ceremonial food,east_africa,"salt, pepper",120.0
+Kenya,Muthokoi,"Dehulled maize, beans",Slow-boil maize and beans until soft,90,Replace beans with green grams,Main,Signature Embu dish,east_africa,"salt, pepper",90.0
+Kenya,Nthaka,Spider plant,Boil → Fry lightly,20,Add groundnuts,Side,Indigenous vegetable,east_africa,"salt, pepper",20.0
+Kenya,Kithenji,Green grams,Boil until soft → Serve,50,Mash or stew,Main,Daily protein food,east_africa,"salt, pepper",50.0
+Kenya,Kienyeji Chicken,Indigenous chicken,Boil then lightly fry,120,Goat meat,Main,Ceremonial,east_africa,"salt, pepper",120.0
+Kenya,Thabai cia Githigo,Arrowroots,Boil until tender → Serve,30,Sweet potatoes,Main,Seasonal staple,east_africa,"salt, pepper",30.0
+Kenya,Mukimo wa Mboga,"Potatoes, greens",Boil and mash with vegetables,30,Add maize,Main,Household meal,east_africa,"salt, pepper",30.0
+Kenya,Githeri wa Nthaka,"Maize, beans, spider plant",Boil maize and beans → Add greens,70,Add pumpkin leaves,Main,Nutritious mixed dish,east_africa,"salt, pepper",70.0
+Kenya,Mucere,Sorghum flour,Cook stiff porridge,15,Millet flour,Main,Traditional staple,east_africa,"salt, pepper",15.0
+Kenya,Kithenji,Green grams,Boil → Lightly fry,45,Lentils,Main,Core Meru dish,east_africa,"salt, pepper",45.0
+Kenya,Mukimo,"Potatoes, maize, beans",Boil → Mash,35,Add greens,Main,Ceremonial,east_africa,"salt, pepper",35.0
+Kenya,Marigu,Pumpkin leaves,Boil → Fry,15,Cowpea leaves,Side,Seasonal vegetable,east_africa,"salt, pepper",15.0
+Kenya,Thabai,Arrowroots,Boil → Serve,30,Sweet potatoes,Main,Traditional root,east_africa,"salt, pepper",30.0
+Kenya,Nderema,Arrowroot leaves,Boil → Fry,20,Spinach,Side,Indigenous green,east_africa,"salt, pepper",20.0
+Kenya,Githeri ya Mbaazi,"Maize, pigeon peas",Boil slowly → Serve,80,Beans,Main,Traditional variation,east_africa,"salt, pepper",80.0
+Kenya,Kienyeji Chicken,Indigenous chicken,Slow stew until tender,120,Goat meat,Main,Special occasions,east_africa,"salt, pepper",120.0
+Kenya,Mucere wa Mboga,"Sorghum flour, vegetables",Cook porridge → Add vegetables,20,Millet flour,Main,Household meal,east_africa,"salt, pepper",20.0
+Kenya,Muthokoi,"Dehulled maize, beans",Slow-boil until soft,90,Green grams,Main,Shared with Embu,east_africa,"salt, pepper",90.0
+Kenya,Nzenga,Green grams,Boil until soft,50,Mash or fry,Main,Common protein,east_africa,"salt, pepper",50.0
+Kenya,Kithaku,"Cowpea leaves, groundnuts",Boil leaves → Add pounded groundnuts,30,Pumpkin leaves,Side,Ceremonial,east_africa,"salt, pepper",30.0
+Kenya,Thabai,Arrowroots,Boil → Serve,30,Sweet potatoes,Main,Seasonal,east_africa,"salt, pepper",30.0
+Kenya,Nzuu,Sun-dried maize,Rehydrate → Boil,90,Mix with beans,Main,Drought food,east_africa,"salt, pepper",90.0
+Kenya,Mbembe,Maize flour,Cook stiff paste,15,Millet flour,Main,Staple,east_africa,"salt, pepper",15.0
+Kenya,Kienyeji Chicken,Indigenous chicken,Slow-cook until tender,120,Goat meat,Main,Ceremonial,east_africa,"salt, pepper",120.0
+Kenya,Githeri ya Njahi,"Black beans, maize",Boil together,100,Fry version,Main,Protein-rich,east_africa,"salt, pepper",100.0
+Kenya,Mchuzi wa Pweza,"Octopus, onion, tomato, spices",Tenderise octopus → Slow-cook with onions and tomatoes until rich and thick,90,Use squid,Main,Traditional coastal delicacy,east_africa,"salt, pepper",90.0
+Kenya,Kuku wa Kupaka,"Chicken, coconut milk, spices",Grill chicken → Simmer in spiced coconut sauce,45,Use fish,Main,Festive home dish,east_africa,"salt, pepper",45.0
+Kenya,Mbaazi za Nazi,"Pigeon peas, coconut milk",Boil peas → Simmer gently in coconut milk,40,Beans instead of peas,Main,Ramadan and home food,east_africa,"salt, pepper",40.0
+Kenya,Ndizi za Kupaka,"Green bananas, coconut milk",Boil bananas → Simmer in coconut sauce,35,Cassava,Main,Everyday coastal meal,east_africa,"salt, pepper",35.0
+Kenya,Tambi za Nazi,"Rice noodles, coconut milk",Simmer noodles in coconut milk,25,Wheat noodles,Main,Simple household meal,east_africa,"salt, pepper",25.0
+Kenya,Chigwede,"Cassava leaves, groundnuts",Boil leaves → Add pounded groundnuts → Simmer,40,Pumpkin leaves,Main,Deeply traditional,east_africa,"salt, pepper",40.0
+Kenya,Wali wa Nazi,"Rice, coconut milk",Cook rice using coconut milk,30,Plain rice,Main,Everyday staple,east_africa,"salt, pepper",30.0
+Kenya,Samaki wa Kupaka,"Fish, coconut paste",Grill fish → Coat with coconut sauce,35,Bake instead of grill,Main,Coastal classic,east_africa,"salt, pepper",35.0
+Kenya,Vibibi,"Rice flour, coconut milk",Steam batter into soft cakes,30,Wheat flour,Snack,Breakfast food,east_africa,"salt, pepper",30.0
+Kenya,Mkate wa Sinia,"Wheat flour, coconut milk",Bake sweet coconut bread,45,Less sugar,Snack,Traditional baked good,east_africa,"salt, pepper",45.0
+Kenya,Atapar,"Meat, water, salt",Boil meat slowly into thick broth,120,Goat or camel,Main,Core Turkana food,east_africa,"salt, pepper",120.0
+Kenya,Lokot,Wild leafy greens,Boil → Fry lightly,20,Pumpkin leaves,Side,Indigenous wild food,east_africa,"salt, pepper",20.0
+Kenya,Ekalale,"Sorghum flour, water",Cook thick sorghum paste,20,Millet flour,Main,Staple food,east_africa,"salt, pepper",20.0
+Kenya,Qalwo,"Millet flour, milk",Cook millet → Add milk → Simmer,20,Sorghum,Main,Signature Borana dish,east_africa,"salt, pepper",20.0
+Kenya,Koche,"Meat, spices",Slow-cook meat with minimal seasoning,90,Goat meat,Main,Traditional meat stew,east_africa,"salt, pepper",90.0
+Kenya,Anjera Qaro,Sorghum flour,Cook soft fermented flatbread,20,Teff substitute,Main,Shared Cushitic food,east_africa,"salt, pepper",20.0
+Kenya,Foon Dhoobo,Camel milk,Drink fresh or fermented,0,Cow milk,Beverage,Daily pastoral food,east_africa,"salt, pepper",0.0
+Kenya,Roasted Camel Meat,Camel meat,Roast slowly over fire,60,Goat meat,Main,Ceremonial food,east_africa,"salt, pepper",60.0
+Kenya,Samburu Meat Soup,"Meat, herbs",Boil meat long hours into broth,120,Add fat,Main,Strength and recovery food,east_africa,"salt, pepper",120.0
+Kenya,Fermented Milk,Milk,Ferment naturally,0,Plain milk,Beverage,Daily nourishment,east_africa,"salt, pepper",0.0
+Kenya,Nzenga,"Green grams, water, salt",Boil green grams slowly until soft → Lightly season → Serve as main,50,Mash lightly or fry with onions,Main,Core everyday Ukambani food,east_africa,"salt, pepper",50.0
+Kenya,Kunde (Nyunyi),"Sun-dried meat, water",Boil dried meat until soft → Lightly fry before serving,60,Goat meat instead of beef,Main,Traditional preserved meat,east_africa,"salt, pepper",60.0
+Kenya,Muthokio,"Maize, beans",Boil maize and beans together until tender,75,Add pumpkin leaves,Main,Food security dish,east_africa,"salt, pepper",75.0
+Kenya,Kithaku,"Cowpea leaves, groundnuts",Boil leaves → Add pounded groundnuts → Simmer,30,Pumpkin leaves,Side,Ceremonial vegetable,east_africa,"salt, pepper",30.0
+Kenya,Mbose,"Finger millet flour, water",Cook into thick porridge while stirring,15,Sorghum flour,Main,Traditional staple,east_africa,"salt, pepper",15.0
+Kenya,Nzuu,Sun-dried maize,Boil maize grains until soft,90,Mix with beans,Main,Drought-season food,east_africa,"salt, pepper",90.0
+Kenya,Kitwii,Green bananas,Boil bananas → Mash lightly,30,Add milk,Main,Seasonal food,east_africa,"salt, pepper",30.0
+Kenya,Kikoto,Roasted maize,Roast maize over fire until charred,20,Boiled maize,Snack,Common rural snack,east_africa,"salt, pepper",20.0
+Kenya,Likhubi,"Millet flour, vegetables",Cook flour into soft mash → Add vegetables,20,Sorghum flour,Main,Traditional mixed dish,east_africa,"salt, pepper",20.0
+Kenya,Namakhalo,"Pumpkin leaves, milk",Boil leaves → Simmer with milk,25,Cowpea leaves,Side,Ceremonial vegetable,east_africa,"salt, pepper",25.0
+Kenya,Ingoho,Termites,Clean → Fry or dry-roast,10,Sun-dry for storage,Snack,Seasonal delicacy,east_africa,"salt, pepper",10.0
+Kenya,Tsimbande,"Beans, maize flour",Cook beans → Thicken with maize flour,60,Use sorghum,Main,Thick traditional stew,east_africa,"salt, pepper",60.0
+Kenya,Esikhati,Cowpea leaves,Boil → Fry lightly,20,Add groundnuts,Side,Common daily food,east_africa,"salt, pepper",20.0
+Kenya,Busuma bwa Madira,Millet flour,Cook into stiff porridge,15,Sorghum,Main,Ceremonial staple,east_africa,"salt, pepper",15.0
+Kenya,Amabere Amaruranu,Sour milk,Ferment milk naturally,0,Plain milk,Beverage,Cultural dairy,east_africa,"salt, pepper",0.0
+Kenya,Lisutsa,"Chicken, onions",Slow-cook chicken until tender,90,Goat meat,Main,Traditional chicken stew,east_africa,"salt, pepper",90.0
+Kenya,Risosa,Green bananas,Boil bananas → Mash,30,Add milk,Main,Staple banana dish,east_africa,"salt, pepper",30.0
+Kenya,Chinsaga,Spider plant,Boil → Fry lightly,20,Add groundnuts,Side,Indigenous bitter green,east_africa,"salt, pepper",20.0
+Kenya,Obokima,Sorghum flour,Cook stiff porridge,15,Millet flour,Main,Ceremonial staple,east_africa,"salt, pepper",15.0
+Kenya,Emonywa,"Pumpkins, maize",Boil together until soft,40,Add beans,Main,Seasonal food,east_africa,"salt, pepper",40.0
+Kenya,Amakonde,Cassava,Boil or sun-dry then boil,30,Sweet potatoes,Main,Root crop staple,east_africa,"salt, pepper",30.0
+Kenya,Nyama ya Enchoke,Goat meat,Boil then fry,90,Beef,Main,Festive meat dish,east_africa,"salt, pepper",90.0
+Kenya,Oborabu,Millet flour,Cook into thick porridge,15,Sorghum,Main,Daily staple,east_africa,"salt, pepper",15.0
+Kenya,Amabere Amang’ina,Fermented milk,Ferment milk → Stir → Serve,0,Plain sour milk,Beverage,Common dairy,east_africa,"salt, pepper",0.0
+Kenya,Kimyet,Pumpkin leaves,Boil → Fry lightly,15,Cowpea leaves,Side,Indigenous vegetable,east_africa,"salt, pepper",15.0
+Kenya,Sagetiek,"Millet flour, milk",Cook millet porridge → Add milk,20,Sorghum,Main,Energy food,east_africa,"salt, pepper",20.0
+Kenya,Chepkube,Beans,Slow-cook beans for several hours,120,Add herbs,Main,Traditional slow food,east_africa,"salt, pepper",120.0
+Kenya,Ng’etuny,Cowpea leaves,Boil → Fry,20,Add milk,Side,Common vegetable,east_africa,"salt, pepper",20.0
+Kenya,Kapchepkendi,Sour milk,Ferment milk naturally,0,Plain fermented milk,Beverage,Daily drink,east_africa,"salt, pepper",0.0
+Kenya,Kipkendi,Fermented grain drink,Ferment millet/sorghum,0,Non-alcoholic version,Beverage,Ceremonial,east_africa,"salt, pepper",0.0
+Kenya,Tingeek,Meat broth,Boil meat slowly for soup,90,Add herbs,Main,Recovery food,east_africa,"salt, pepper",90.0
+Kenya,Roasted Ox Meat,Beef,Roast over fire,45,Goat meat,Main,Ceremonial,east_africa,"salt, pepper",45.0
+Kenya,Nkoriong,Roasted meat,Roast meat over open fire,45,Goat meat,Main,Core Maasai food,east_africa,"salt, pepper",45.0
+Kenya,Kule naoto,Milk,Drink fresh or lightly fermented,0,Sour milk,Beverage,Daily food,east_africa,"salt, pepper",0.0
+Kenya,Enkare naibor,"Milk, blood",Mix fresh blood with milk,0,Milk only,Beverage,Ceremonial,east_africa,"salt, pepper",0.0
+Kenya,Olpurda,Meat stew,Boil meat until tender,90,Add herbs,Main,Household dish,east_africa,"salt, pepper",90.0
+Kenya,Roasted Bone Marrow,Bones,Roast bones → Extract marrow,30,Boiled bones,Snack,Nutrient-rich,east_africa,"salt, pepper",30.0
+Kenya,Enkima,Meat strips,Dry meat for preservation,0,Fry later,Protein,Dry-season food,east_africa,"salt, pepper",0.0
+Kenya,Soup la Enkai,Meat broth,Long boil meat,120,Add fat,Main,Strength food,east_africa,"salt, pepper",120.0
+Kenya,Milk Tea (Traditional),"Milk, tea leaves",Boil milk with tea,10,Plain milk,Beverage,Modern adaptation,east_africa,"salt, pepper",10.0
+Uganda,Matoke,"Green bananas, onion, tomato, cooking oil","Spices: Garlic,Ginger
+Method: Steam/Stew
+Steps: Fry onion & spices of choice → Add bananas → Add water → Simmer
+Time: 40 min",40 min,Pumpkin,Staple,National staple,east_africa,"salt, pepper",40.0
+Uganda,Posho,"Maize flour, water","Method: Boil
+Steps: Boil water → Add maize flour → Stir until firm
+Time: 15 min",15 min,Millet flour,Staple,Common household food,east_africa,"salt, pepper",15.0
+Uganda,Beans Stew,"Dry beans, onion, tomato, cooking oil, salt","Method: Stew
+Steps: Boil beans → Fry onion, tomato, spices → Add beans → Simmer
+Time: 45 min",45 min,Cowpeas,Legume dish,Daily household meal,east_africa,"salt, pepper",45.0
+Uganda,Groundnut Stew,"Groundnuts, onion, tomato, cooking oil","Method: Stew
+Steps: Fry onion → Add tomato → Add groundnut paste → Simmer
+Time: 30 min",30 min,Peanut paste,Stew,Widely consumed,east_africa,"salt, pepper",30.0
+Uganda,Katogo,"Matoke, beans or meat, cooking oil","Spices: Garlic, ginger
+Method: Steam/Stew
+Steps: Fry onion & spices → Add bananas → Add water → Simmer
+Time: 40 min",40 min,Irish potatoes,Mixed dish,Breakfast/lunch,east_africa,"salt, pepper",40.0
+Uganda,Rolex,"Eggs, chapati, onion, tomato, cooking oil","Method: Fry
+Steps: Fry egg with onion & tomato → Wrap in chapati
+Time: 10 min",10 min,Cabbage,Street meal,Extremely common,east_africa,"salt, pepper",10.0
+Uganda,Sweet Potatoes,"Sweet potatoes, water","Method: Boil
+Steps: Wash sweet potatoes → Peel if needed → Add to pot with water → Boil until tender → Drain and serve
+Time: 25–35 min",25–35 min,"Yam, Butternut squash",Staple,Widely eaten,east_africa,"salt, pepper",30.0
+Uganda,Cassava,"Cassava root, water","Method: Boil
+Steps: Peel cassava → Cut into pieces → Wash → Boil in water until soft → Drain and serve
+Time: 30–45 min",30–45 min,"Yuca root, Waxy potatoes, Parsnips",Staple,Rural & urban,east_africa,"salt, pepper",37.5
+Uganda,Fish Stew,"Fresh fish, onion, tomato, cooking oil","Method: Stew   Steps: Fry onion, tomato, spices → Add fish → Simmer gently
+Time: 30 min",30 min,Dagaa,Protein dish,Lakeside regions,east_africa,"salt, pepper",30.0
+Uganda,Malewa,"Bamboo shoots, onion, cooking oil","Method: Fry
+Steps: Fry onion → Add tomato → Add greens → Cook briefly
+Time: 15 min",15 min,"Canned bamboo shoots, Hearts of palm",Vegetable dish,Eastern Uganda,east_africa,"salt, pepper",15.0
+Uganda,Nakati,"Solanum leaves, onion, tomato, cooking oil","Method: Fry
+Steps: Fry onion → Add tomato → Add greens → Cook briefly
+Time: 15 min",15 min,Managu,Vegetable dish,Indigenous green,east_africa,"salt, pepper",15.0
+Uganda,Doodo,"Amaranth leaves, onion, tomato, cooking oil","Method: Fry
+Steps: Fry onion → Add tomato → Add greens → Cook briefly
+Time: 15 min",15 min,Pumpkin leaves,Vegetable dish,Very common,east_africa,"salt, pepper",15.0
+Uganda,Luwombo,"Meat, groundnuts, vegetables","Spices: Garlic, ginger
+Method: Steam
+Steps: Mix meat or groundnuts with onion, tomato, spices → Wrap in banana leaves → Place in pot → Add small amount of water → Steam until cooked
+Time: 60–90 min",60–90 min,Banana leaves wrap,Stew,Traditional home dish,east_africa,"salt, pepper",75.0
+Uganda,Uji,"Millet flour or sorghum flour, water","Method: Boil
+Steps: Mix flour & water → Cook while stirring → Simmer → Serve
+Time: 10 min",10 min,Maize flour,Porridge,Breakfast,east_africa,"salt, pepper",10.0
+Uganda,Boiled Groundnuts,"Fresh groundnuts, water","Method: Boil
+Steps: Wash groundnuts → Add to pot with water → Add salt (optional) → Boil until soft → Drain and serve
+Time: 45–60 min",45–60 min,Roasted,Protein snack,Seasonal,east_africa,"salt, pepper",52.5
+Tanzania,Ugali,"Maize flour, water","Method: Boil
+Steps: Boil water → Add flour  → Cook until done
+Time: 15–30 min",15–30 min,"Sorghum flour, millet flour",Staple,National staple,east_africa,"salt, pepper",22.5
+Tanzania,Wali,"Rice, water, salt","Method: Boil
+Steps: Boil water → Add rice → Cook until done
+Time: 15–30 min",15–30 min,Coconut rice (wali wa nazi),Staple,Common inland & coastal,east_africa,"salt, pepper",22.5
+Tanzania,Maharage,"Dry beans, onion, tomato, cooking oil, salt","Spices: Garlic, ginger
+Method: Stew
+Steps: Boil beans → Fry onion, tomato, spices → Add beans → Simmer
+Time: 45 min",45 min,Cowpeas,Legume dish,Daily household meal,east_africa,"salt, pepper",45.0
+Tanzania,Samaki wa Kupika,"Fresh fish, onion, tomato, cooking oil, salt","Spices: Garlic, ginger, coriander
+Method: Stew
+Steps: Fry onion & spices → Add coconut milk → Add protein → Simmer
+Time: 40 min",40 min,Dagaa,Protein dish,Widely consumed,east_africa,"salt, pepper",40.0
+Tanzania,Dagaa,"Small dried fish, onion, tomato, cooking oil","Spices: Garlic, black pepper
+Method: Fry/Stew
+Steps: Fry onion, tomato, spices → Add fish → Cook briefly
+Time: 20 min",20 min,Fresh sardines,Protein dish,Lake & coastal zones,east_africa,"salt, pepper",20.0
+Tanzania,Ndizi Nyama,"Cooking bananas, beef, onion, tomato, oil","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onion & spices → Add meat → Add bananas → Simmer
+Time: 45 min",45 min,"Goat meat, potatoes",Stew,Northern Tanzania,east_africa,"salt, pepper",45.0
+Tanzania,Sekela,"Beef, cooking bananas, onion, tomato, cooking oil","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onion & spices → Add meat → Add bananas → Simmer
+Time: 45 min",45 min,Goat meat,One-pot dish,NW Tanzania staple,east_africa,"salt, pepper",45.0
+Tanzania,Kisamvu,"Cassava leaves, onion, cooking oil","Spices: Garlic
+Method: Fry
+Steps: Fry onion → Add tomato → Add greens → Cook
+Time: 15 min",15 min,Spinach,Vegetable dish,Lake zones,east_africa,"salt, pepper",15.0
+Tanzania,Mchicha,"Amaranth leaves, onion, tomato, cooking oil","Spices: Garlic
+Method: Fry
+Steps: Fry onion → Add tomato → Add greens → Cook
+Time: 15 min",15 min,Pumpkin leaves,Vegetable dish,Indigenous leafy vegetable,east_africa,"salt, pepper",15.0
+Tanzania,Mboga za Majani,"Mixed leafy greens, onion, tomato, oil","
+Method: Fry
+Steps: Fry onion → Add tomato → Add greens → Cook
+Time: 15 min",15 min,Sukuma wiki,Vegetable dish,Generic daily greens,east_africa,"salt, pepper",15.0
+Tanzania,Viazi,"Irish potatoes, water","Method: Boil
+Steps: Wash sweet potatoes → Peel if needed → Add to pot with water → Boil until tender → Drain and serve
+Time: 25–35 min",25–35 min,Sweet potatoes,Staple,Household food,east_africa,"salt, pepper",30.0
+Tanzania,Mihogo,"Cassava root, water","Method: Boil
+Steps: Wash Cassava → Peel if needed→ Add to pot with water → Boil until tender → Drain and serve
+Time: 25–35 min",25–35 min,Irish Potatoes,Staple,Rural & peri-urban,east_africa,"salt, pepper",30.0
+Tanzania,Chapati,"Wheat flour, water, cooking oil, salt","Method: Fry
+Steps: Mix flour, water, oil, and salt → Knead into soft dough → Roll into flat circles → Cook on hot pan until golden on both sides
+Time: 30–40 min",30–40 min,Whole-wheat chapati,Flatbread,Common accompaniment,east_africa,"salt, pepper",35.0
+Tanzania,Kuku Stew,"Chicken, onion, tomato, cooking oil, salt","Method: Stew   Steps: Fry onion, tomato, spices → Add chicken → Simmer gently
+Time: 30 min",30 min,Duck meat,Stew,Home-style protein,east_africa,"salt, pepper",30.0
+Tanzania,Uji,"Millet or sorghum flour, water","Method: Boil
+Steps: Mix flour & water → Cook while stirring → Simmer → Serve
+Time: 10 min",10 min,Maize flour,Porridge,Breakfast / light meal,east_africa,"salt, pepper",10.0
+Ethiopia,Shiro,"Chickpea flour, onion, garlic, oil, spices","Spices: Garlic, ginger, berbere
+Method: Stew
+Steps: Fry onion & spices → Add flour→ Simmer
+Time: 30–40 min",30–40 min,Lentil flour,Legume stew,Very common,east_africa,"salt, pepper",35.0
+Ethiopia,Misir Wot,"Red lentils, onion, garlic, oil, berbere","Spices: Garlic, ginger, berbere
+Method: Stew
+Steps: Fry onion & spices → Add lentils → Simmer
+Time: 30–40 min",30–40 min,Yellow lentils,Legume stew,Widely consumed,east_africa,"salt, pepper",35.0
+Ethiopia,Kik Alicha,"Yellow split peas, onion, garlic, oil","Spices: Garlic, ginger, berbere
+Method: Stew
+Steps: Fry onion & spices → Add split peas → Simmer
+Time: 30–40 min",30–40 min,Lentils,Legume stew,Mild stew,east_africa,"salt, pepper",35.0
+Ethiopia,Tibs,"Beef, onion, garlic, oil, spices","Spices: Garlic, ginger, berbere (optional black pepper)
+Method: Fry
+Steps: Heat oil → Fry onions → Add garlic, ginger, spices → Add meat → Cook until done
+Time: 25–30 min",25–30 min,Goat meat,Protein dish,Home & restaurant,east_africa,"salt, pepper",27.5
+Ethiopia,Doro Wot,"Chicken, onion, garlic, berbere, eggs","Spices: Garlic, ginger, berbere
+Method: Stew
+Steps: Fry onion & spices → Add chicken → Simmer → Add eggs
+Time: 60 min",60 min,Duck meat,Stew,Common household dish,east_africa,"salt, pepper",60.0
+Ethiopia,Gomen,"Collard greens, onion, garlic, oil","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onion → Add vegetables → Simmer
+Time: 30 min",30 min,Kale,Vegetable dish,Daily vegetable,east_africa,"salt, pepper",30.0
+Ethiopia,Atakilt Wat,"Cabbage, carrot, potato, onion, oil","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onion → Add vegetables → Simmer
+Time: 30 min",30 min,Cauliflower,Vegetable stew,Simple & common,east_africa,"salt, pepper",30.0
+Ethiopia,Firfir,"Injera pieces, spices, oil","Spices: Garlic, ginger, berbere
+Method: Fry
+Steps: Fry onions → Add garlic, ginger, spices → Add torn injera → Mix and heat through
+Time: 15–20 min",15–20 min,Tomato firfir,Mixed dish,Breakfast/light meal,east_africa,"salt, pepper",17.5
+Ethiopia,Kinche,"Cracked wheat, water","Method: Boil
+Steps: Boil water → Add cracked wheat → Cook while stirring → Simmer until soft
+Time: 20–25 min",20–25 min,Barley,Porridge,Breakfast,east_africa,"salt, pepper",22.5
+Ethiopia,Ful Medames,"Fava beans, onion, oil","Method: Stew
+Steps: Boil fava beans → Fry onions and garlic → Add peas → Simmer and mash lightly
+Time: 30–40 min",30–40 min,Chickpeas,Legume dish,Urban breakfast,east_africa,"salt, pepper",35.0
+Ethiopia,Boiled Potatoes,"Potatoes, water","Method: Boil
+Steps: Wash potatoes → Peel if desired → Boil in water until soft → Drain and serve
+Time: 20–30 min",20–30 min,Sweet potatoes,Staple,Rural households,east_africa,"salt, pepper",25.0
+Ethiopia,Lentil Soup,"Lentils, onion, garlic, oil","Method: Boil / Stew
+Steps: Wash lentils → Boil in water until soft → Fry onions with garlic and ginger → Add to lentils → Simmer briefly and serve
+Time: 30–40 min",30–40 min,Split peas,Soup,Common fasting food,east_africa,"salt, pepper",35.0
+Ethiopia,Cabbage Stew,"Cabbage, onion, oil","Spices: Garlic, ginger (optional black pepper)
+Method: Stew
+Steps: Fry onions → Add garlic, ginger → Add cabbage → Add little water → Simmer until soft
+Time: 25–30 min",25–30 min,Greens,Vegetable dish,Affordable,east_africa,"salt, pepper",27.5
+South Sudan,Kisra,"Sorghum flour, water","Method: Cook
+Steps: Mix sorghum flour with water to make thin batter → Heat flat pan → Pour batter and spread thin → Cook until set → Remove and serve
+Time: 20–30 min",20–30 min,Millet flour,Staple,National staple flatbread,east_africa,"salt, pepper",25.0
+South Sudan,Asida,"Sorghum flour, water","Method: Boil
+Steps: Boil water → Slowly add sorghum flour while stirring → Stir until thick and smooth → Cook briefly and serve
+Time: 15–20 min",15–20 min,Millet flour,Staple,Thick porridge,east_africa,"salt, pepper",17.5
+South Sudan,Ful Medames,"Fava beans, onion, oil, salt","Method: Stew
+Steps: Boil fava beans until soft → Fry onions and garlic → Add beans → Mash lightly → Simmer and serve
+Time: 30–40 min",30–40 min,Cowpeas,Legume dish,Common breakfast,east_africa,"salt, pepper",35.0
+South Sudan,Bamya,"Okra, onion, tomato, oil, salt","Spices: Garlic
+Method: Stew
+Steps: Fry onions in oil → Add tomatoes and garlic → Add okra → Add water → Simmer until soft
+Time: 30–35 min",30–35 min,Dried okra,Vegetable stew,Very common,east_africa,"salt, pepper",32.5
+South Sudan,Mulukhiyah,"Jute mallow leaves, water, salt","Method: Boil
+Steps: Boil water → Add chopped leaves → Stir gently → Cook until soft → Serve
+Time: 20–25 min",20–25 min,Pumpkin leaves,Vegetable dish,Indigenous leafy green,east_africa,"salt, pepper",22.5
+South Sudan,Leafy Greens Stew,"Amaranth leaves, onion, oil, salt","Method: Stew
+Steps: Fry onions → Add garlic → Add chopped greens → Add small amount of water → Simmer until tender
+Time: 20–25 min",20–25 min,Cowpea leaves,Vegetable dish,Daily meal,east_africa,"salt, pepper",22.5
+South Sudan,Meat Stew,"Beef, onion, tomato, oil, salt","Spices: Garlic, ginger, black pepper
+Method: Stew
+Steps: Boil meat until tender → Fry onions and spices → Add meat → Simmer until thick
+Time: 60–75 min",60–75 min,Goat meat,Protein dish,Household staple,east_africa,"salt, pepper",67.5
+South Sudan,Fish Stew,"Fresh fish, onion, tomato, oil","Spices: Garlic, black pepper
+Method: Stew
+Steps: Fry onions → Add tomatoes and spices → Add fish → Simmer gently until cooked
+Time: 25–30 min",25–30 min,Dried fish,Protein dish,Riverine communities,east_africa,"salt, pepper",27.5
+South Sudan,Lentil Stew,"Lentils, onion, oil, salt","Spices: Garlic, ginger
+Method: Stew
+Steps: Boil lentils until soft → Fry onions and spices → Add lentils → Simmer and serve
+Time: 30–40 min",30–40 min,Split peas,Legume stew,Affordable protein,east_africa,"salt, pepper",35.0
+South Sudan,Sorghum Porridge,"Sorghum flour, water","Method: Boil
+Steps: Mix sorghum flour with water → Cook while stirring → Simmer until smooth → Serve warm
+Time: 10–15 min",10–15 min,Millet flour,Porridge,Breakfast/light meal,east_africa,"salt, pepper",12.5
+South Sudan,Boiled Cassava,"Cassava root, water","
+Method: Boil
+Steps: Peel cassava → Cut into pieces → Wash → Boil in water until soft → Drain and serve
+Time: 30–45 min",30–45 min,Yam,Staple,Rural areas,east_africa,"salt, pepper",37.5
+South Sudan,Boiled Groundnuts,"Fresh groundnuts, water","
+Method: Boil
+Steps: Wash groundnuts → Add to pot with water → Add salt (optional) → Boil until soft → Drain and serve
+Time: 45–60 min",45–60 min,Roasted,Protein snack,Seasonal,east_africa,"salt, pepper",52.5
+Rwanda,Ugali (Ubugari),"Maize flour, water","Method: Boil
+Steps: Boil water → Add maize flour slowly → Stir until firm → Cook briefly → Serve
+Time: 15–20 min",15–20 min,Sorghum flour,Staple,National staple,east_africa,"salt, pepper",17.5
+Rwanda,Isombe,"Cassava leaves, onion, oil, salt","Spices: Garlic
+Method: Stew
+Steps: Boil cassava leaves until soft → Fry onions and garlic → Add leaves → Simmer and serve
+Time: 35–45 min",35–45 min,With groundnuts,Vegetable dish,Very common,east_africa,"salt, pepper",40.0
+Rwanda,Beans Stew,"Dry beans, onion, tomato, oil, salt","Spices: Garlic
+Method: Stew
+Steps: Boil beans until soft → Fry onions and garlic → Add beans → Simmer and serve
+Time: 40–50 min",40–50 min,Cowpeas,Legume dish,Daily household food,east_africa,"salt, pepper",45.0
+Rwanda,Ibihaza,"Pumpkin, beans, onion, oil","Spices: Garlic
+Method: Stew
+Steps: Boil pumpkin and beans → Fry onions and garlic → Add mixture → Simmer
+Time: 35–45 min",35–45 min,Maize,Mixed dish,Traditional,east_africa,"salt, pepper",40.0
+Rwanda,Sweet Potatoes,"Sweet potatoes, water","Method: Boil
+Steps: Wash and peel potatoes → Boil in water until soft → Drain and serve
+Time: 25–35 min",25–35 min,Irish potatoes,Staple,Widely eaten,east_africa,"salt, pepper",30.0
+Rwanda,Cassava,"Cassava root, water","Spices: None
+Method: Boil
+Steps: Peel cassava → Cut and wash → Boil until soft → Drain and serve
+Time: 30–45 min",30–45 min,Sweet Potatoes,Staple,Rural & urban,east_africa,"salt, pepper",37.5
+Rwanda,Groundnut Sauce,"Groundnuts, onion, tomato","Spices: Garlic
+Method: Stew
+Steps: Fry onions and garlic → Add groundnut paste → Add water → Simmer until thick
+Time: 20–30 min",20–30 min,Peanut paste,Stew,Common accompaniment,east_africa,"salt, pepper",25.0
+Rwanda,Dodo,"Amaranth leaves, onion, oil, salt","Spices: Garlic
+Method: Fry
+Steps: Fry onions and garlic → Add chopped greens → Cook briefly → Serve
+Time: 15–20 min",15–20 min,Pumpkin leaves,Vegetable dish,Indigenous leafy green,east_africa,"salt, pepper",17.5
+Rwanda,Meat Stew,"Beef, onion, tomato, oil","Spices: Garlic, black pepper
+Method: Stew
+Steps: Boil meat until tender → Fry onions and spices → Add meat → Simmer
+Time: 60–75 min",60–75 min,Goat meat,Protein dish,Household meal,east_africa,"salt, pepper",67.5
+Rwanda,Fish Stew,"Fresh fish, onion, tomato, oil","Spices: Garlic
+Method: Stew
+Steps: Fry onions and garlic → Add tomatoes → Add fish → Simmer gently
+Time: 25–30 min",25–30 min,Dried fish,Protein dish,Lakeside areas,east_africa,"salt, pepper",27.5
+Rwanda,Boiled Maize,"Fresh maize, water","
+Method: Boil
+Steps: Wash fresh maize → Boil in water until tender → Drain and serve
+Time: 30–45 min",30–45 min,Roasted,Snack,Seasonal,east_africa,"salt, pepper",37.5
+Rwanda,Sorghum Porridge,"Sorghum flour, water","
+Method: Boil
+Steps: Mix sorghum flour with water → Cook while stirring → Simmer until smooth
+Time: 10–15 min",10–15 min,Millet flour,Porridge,Breakfast/light meal,east_africa,"salt, pepper",12.5
+Burundi,Ugali (Ubugari),"Maize flour, water","Method: Boil
+Steps: Boil water → Add maize flour → Stir until firm → Serve
+Time: 15–20 min",15–20 min,Sorghum flour,Staple,National staple,east_africa,"salt, pepper",17.5
+Burundi,Isombe,"Cassava leaves, onion, oil, salt","Spices: Garlic
+Method: Stew
+Steps: Boil cassava leaves → Fry onions and garlic → Add leaves → Simmer
+Time: 35–45 min",35–45 min,With groundnuts,Vegetable dish,Very common,east_africa,"salt, pepper",40.0
+Burundi,Beans Stew,"Dry beans, onion, tomato, oil","Spices: Garlic
+Method: Stew
+Steps: Boil beans → Fry onions and garlic → Add beans → Simmer
+Time: 40–50 min",40–50 min,Cowpeas,Legume dish,Daily household meal,east_africa,"salt, pepper",45.0
+Burundi,Ibiharage,"Beans, onion, oil, salt","Spices: Garlic
+Method: Stew
+Steps: Boil beans → Fry onions and garlic → Add beans → Simmer
+Time: 40–50 min",40–50 min,With maize,Legume dish,Staple protein,east_africa,"salt, pepper",45.0
+Burundi,Sweet Potatoes,"Sweet potatoes, water","Method: Boil
+Steps: Wash and peel → Boil until soft → Drain and serve
+Time: 25–35 min",25–35 min,Irish potatoes,Staple,Common,east_africa,"salt, pepper",30.0
+Burundi,Cassava,"Cassava root, water","Method: Boil
+Steps: Peel cassava → Wash → Boil until soft → Drain
+Time: 30–45 min",30–45 min,Irish potatoes,Staple,Rural areas,east_africa,"salt, pepper",37.5
+Burundi,Groundnut Sauce,"Groundnuts, onion, tomato","Method: Stew
+Steps: Fry onions and garlic → Add groundnut paste → Add water → Simmer
+Time: 20–30 min",20–30 min,Peanut paste,Stew,Common accompaniment,east_africa,"salt, pepper",25.0
+Burundi,Dodo,"Amaranth leaves, onion, oil","Spices: Garlic
+Method: Fry
+Steps: Fry onions and garlic → Add greens → Cook briefly
+Time: 15–20 min",15–20 min,Pumpkin leaves,Vegetable dish,Indigenous green,east_africa,"salt, pepper",17.5
+Burundi,Small Fish Stew,"Small fish, onion, tomato, oil","Spices: Garlic
+Method: Stew
+Steps: Fry onions and garlic → Add tomatoes → Add small fish → Simmer
+Time: 20–25 min",20–25 min,Dried fish,Protein dish,Lake Tanganyika,east_africa,"salt, pepper",22.5
+Burundi,Meat Stew,"Beef, onion, tomato, oil","Spices: Garlic, black pepper
+Method: Stew
+Steps: Boil meat → Fry onions and spices → Add meat → Simmer
+Time: 60–75 min",60–75 min,Goat meat,Protein dish,Occasional,east_africa,"salt, pepper",67.5
+Burundi,Boiled Maize,"Fresh maize, water","Method: Boil
+Steps: Wash maize → Boil until tender → Drain
+Time: 30–45 min",30–45 min,Roasted,Snack,Seasonal,east_africa,"salt, pepper",37.5
+Burundi,Sorghum Porridge,"Sorghum flour, water","Method: Boil
+Steps: Mix flour with water → Cook while stirring → Simmer
+Time: 10–15 min",10–15 min,Millet flour,Porridge,Breakfast,east_africa,"salt, pepper",12.5
+Swahili,Biriani,"Rice, meat (beef/chicken), onions, garlic, ginger, spices","Spices: Garlic, ginger, cardamom, cloves, cinnamon
+Method: Simmer
+Steps: Fry onions and spices → Add meat → Add rice and water → Simmer until cooked
+Time: 50–60 min",50–60 min,Goat meat,Rice dish,Distinct from pilau,east_africa,"salt, pepper",55.0
+Swahili,Mchuzi wa Nazi,"Coconut milk, onion, tomato, spices","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onions and spices → Add coconut milk → Simmer → Serve
+Time: 25–30 min",25–30 min,With fish or chicken,Stew,Coconut-based,east_africa,"salt, pepper",27.5
+Swahili,Samaki wa Nazi,"Fish, coconut milk, onion, spices","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onions and spices → Add coconut milk → Add fish → Simmer gently
+Time: 30–35 min",30–35 min,Tilapia,Protein dish,Coastal staple,east_africa,"salt, pepper",32.5
+Swahili,Kuku wa Nazi,"Chicken, coconut milk, onion, spices","Spices: Garlic, ginger
+Method: Stew
+Steps: Fry onions and spices → Add chicken → Add coconut milk → Simmer
+Time: 40–50 min",40–50 min,Duck meat,Protein dish,Home-style meal,east_africa,"salt, pepper",45.0
+Swahili,Maharage ya Nazi,"Beans, coconut milk, onion, salt","Spices: Garlic, ginger
+Method: Stew
+Steps: Boil beans → Fry onions and spices → Add coconut milk → Simmer
+Time: 35–45 min",35–45 min,Cowpeas,Legume dish,Common household food,east_africa,"salt, pepper",40.0
+Swahili,Ndizi za Nazi,"Green bananas, coconut milk, onion","Spices: Garlic
+Method: Stew
+Steps: Fry onions → Add bananas → Add coconut milk → Simmer
+Time: 30–35 min",30–35 min,Sweet potatoes,Stew,Coastal banana dish,east_africa,"salt, pepper",32.5
+Swahili,Viazi vya Nazi,"Potatoes, coconut milk, onion","Spices: Garlic
+Method: Stew
+Steps: Fry onions → Add potatoes → Add coconut milk → Simmer
+Time: 25–30 min",25–30 min,Cassava,Vegetable dish,Simple & common,east_africa,"salt, pepper",27.5
+Swahili,Mbaazi wa Nazi,"Pigeon peas, coconut milk, onion","Spices: Garlic, ginger
+Method: Stew
+Steps: Boil pigeon peas → Fry onions and spices → Add coconut milk → Simmer
+Time: 30–40 min",30–40 min,Green peas,Legume dish,Coastal favorite,east_africa,"salt, pepper",35.0
+Swahili,Achari ya Mboga,"Mixed vegetables, vinegar, spices","Spices: Turmeric, garlic
+Method: Mix
+Steps: Chop vegetables → Mix with spices and vinegar → Rest briefly → Serve
+Time: 10–15 min",10–15 min,Mango achari,Side dish,Pickled vegetables,east_africa,"salt, pepper",12.5
+Swahili,Kaimati,"Wheat flour, sugar, yeast, oil","Spices: Cardamom
+Method: Fry
+Steps: Mix batter → Rest → Fry small balls until golden → Drain
+Time: 30–40 min",30–40 min,Cassava Flour,Snack,Coastal street food,east_africa,"salt, pepper",35.0
+Swahili,Mkate wa Kumimina,"Wheat flour, coconut milk, yeast","Spices: Cardamom
+Method: Bake
+Steps: Mix batter → Pour into pan → Cook until set → Serve
+Time: 30–40 min",30–40 min,Cassava Flour,Bread,Indigenous Swahili bread,east_africa,"salt, pepper",35.0
+Swahili,Mahamri,"Wheat flour, coconut milk, sugar, yeast","Spices: Cardamom
+Method: Fry
+Steps: Mix dough → Rest → Shape → Fry until golden
+Time: 40–50 min",40–50 min,Cardamom,Snack,Breakfast staple,east_africa,"salt, pepper",45.0
+Swahili,Tambi za Nazi,"Spaghetti, coconut milk, onion","Spices: Garlic
+Method: Stew
+Steps: Cook pasta → Fry onions → Add coconut milk → Mix pasta → Simmer
+Time: 25–30 min",25–30 min,Rice noodles,Pasta dish,Coastal adaptation,east_africa,"salt, pepper",27.5
+Swahili,Urojo,"Mango, chickpea flour, spices","Spices: Turmeric, garlic
+Method: Boil
+Steps: Mix flour with water → Cook until thick → Add spices → Simmer
+Time: 20–30 min",20–30 min,Tamarind,Soup/snack,Zanzibar street food,east_africa,"salt, pepper",25.0
+Swahili,Pweza wa Nazi,"Octopus, coconut milk, onion, spices","Spices: Garlic, ginger
+Method: Stew
+Steps: Boil octopus → Fry onions and spices → Add coconut milk → Simmer
+Time: 45–60 min",45–60 min,Squid,Seafood dish,Coastal indigenous,east_africa,"salt, pepper",52.5
+South Africa,Pap en Vleis,"Maize meal, beef, onion, oil, salt","Boil water → Add maize meal gradually, stir to stiff pap → Grill or stew beef with onion → Serve together",45 min,"Beef → boerewors, chicken, goat",Main,"Everyday staple, eaten across ethnic groups",southern_africa,"salt, pepper",45.0
+South Africa,Chakalaka,"Baked beans, tomatoes, onion, carrots, chili, oil",Fry onion & chili → Add vegetables → Add tomatoes & beans → Simmer,30 min,"Add cabbage, peppers",Side,Common with braai and pap,southern_africa,"salt, pepper",30.0
+South Africa,Bunny Chow,"White bread loaf, curry (beans/meat), spices",Cook thick curry → Hollow bread → Fill with curry → Serve hot,50 min,Bean curry → chicken or mutton,Main,Durban Indian-South African street food,southern_africa,"salt, pepper",50.0
+South Africa,Umngqusho,"Samp, sugar beans, water, salt",Boil samp & beans together until soft → Season lightly,90 min,"Add butter, meat",Main,Traditional Xhosa dish,southern_africa,"salt, pepper",90.0
+South Africa,Morogo,"Wild leafy greens, onion, oil, salt",Boil greens → Lightly fry with onion & oil,20 min,"Spinach, amaranth",Side,Indigenous leafy greens,southern_africa,"salt, pepper",20.0
+South Africa,Potjiekos,"Beef/chicken, potatoes, carrots, onion",Layer ingredients in pot → Slow cook without stirring,2 hrs,Chicken version,Main,Outdoor communal cooking,southern_africa,"salt, pepper",120.0
+South Africa,Dombolo,"Flour, yeast, sugar, water",Make dough → Steam until fluffy,60 min,Add herbs,Side,Steamed bread,southern_africa,"salt, pepper",60.0
+South Africa,Biltong,"Beef, salt, vinegar, coriander",Marinate meat → Air dry,2–3 days,Game meat,Snack,Preserved protein,southern_africa,"salt, pepper",3600.0
+Zambia,Nshima,"Maize meal, water",Cook thick maize porridge while stirring,25 min,Millet meal,Staple,National staple,southern_africa,"salt, pepper",25.0
+Zambia,Ifisashi,"Greens, groundnut paste, onion",Simmer greens → Add peanut paste → Cook gently,35 min,Pumpkin leaves,Side,Nutty vegetable dish,southern_africa,"salt, pepper",35.0
+Zambia,Chibwabwa,"Pumpkin leaves, groundnuts",Boil leaves → Add crushed groundnuts,30 min,Kale substitute,Side,Common rural dish,southern_africa,"salt, pepper",30.0
+Zambia,Kapenta Stew,"Dried kapenta fish, tomato, onion",Fry fish → Add tomato & onion → Simmer,25 min,Fresh sardines,Protein,Lake fish dish,southern_africa,"salt, pepper",25.0
+Zambia,Delele,"Okra, onion, oil",Boil okra → Light sauté,20 min,Add tomatoes,Side,Slimy texture valued,southern_africa,"salt, pepper",20.0
+Zambia,Lunkhuni,"Smoked fish, tomatoes, onion",Rehydrate fish → Stew with tomatoes,40 min,Fresh fish,Main,Northern Zambia,southern_africa,"salt, pepper",40.0
+Zambia,Katapa,"Cassava leaves, groundnuts",Boil leaves → Add peanut paste,45 min,Spinach,Main,Traditional vegetable,southern_africa,"salt, pepper",45.0
+Zambia,Insima ne Ndiwo,"Maize meal, vegetable relish",Cook nshima → Prepare relish → Serve,35 min,Various relishes,Main,Everyday meal,southern_africa,"salt, pepper",35.0
+Zimbabwe,Sadza,"Maize meal, water",Cook thick maize paste,25 min,Sorghum meal,Staple,Daily food,southern_africa,"salt, pepper",25.0
+Zimbabwe,Nyama ne Dovi,"Beef, groundnut paste, onion",Stew beef → Add peanut paste → Simmer,60 min,Chicken substitute,Main,Protein-rich,southern_africa,"salt, pepper",60.0
+Zimbabwe,Muriwo Une Dovi,"Leafy greens, groundnut paste",Boil greens → Add peanut sauce,30 min,Pumpkin leaves,Side,Rural staple,southern_africa,"salt, pepper",30.0
+Zimbabwe,Derere,"Okra, tomatoes",Boil okra → Add tomato,25 min,Add beef,Side,Traditional relish,southern_africa,"salt, pepper",25.0
+Zimbabwe,Maputi,Roasted maize kernels,Dry roast maize,15 min,Add salt,Snack,Common snack,southern_africa,"salt, pepper",15.0
+Zimbabwe,Kapenta,Dried kapenta fish,Fry or stew lightly,20 min,Fresh fish,Protein,Lake Kariba,southern_africa,"salt, pepper",20.0
+Zimbabwe,Rupiza,Dried vegetables,Rehydrate → Cook with oil,30 min,Fresh greens,Side,Preserved food,southern_africa,"salt, pepper",30.0
+Zimbabwe,Chimodho,Cornmeal dumplings,Steam dough,40 min,Sweet version,Snack,Traditional bread,southern_africa,"salt, pepper",40.0
+Botswana,Seswaa,"Beef, salt, water",Boil beef until soft → Pound,90 min,Goat meat,Main,Ceremonial food,southern_africa,"salt, pepper",90.0
+Botswana,Bogobe,"Sorghum meal, water",Cook thick porridge,30 min,Maize meal,Staple,Traditional grain,southern_africa,"salt, pepper",30.0
+Botswana,Delele,"Okra, onion",Boil okra → Light sauté,20 min,Add tomatoes,Side,Indigenous,southern_africa,"salt, pepper",20.0
+Botswana,Morama Beans,"Morama beans, water",Boil until tender,60 min,Groundnuts,Protein,Indigenous legume,southern_africa,"salt, pepper",60.0
+Botswana,Vetkoek,"Flour, yeast, oil",Fry dough until golden,30 min,Stuffed version,Snack,Popular street food,southern_africa,"salt, pepper",30.0
+Botswana,Dikgobe,"Beans, maize",Boil together,70 min,Add pumpkin,Main,Filling dish,southern_africa,"salt, pepper",70.0
+Botswana,Madila,Sour milk,Ferment milk,2–3 days,Yogurt,Beverage,Traditional dairy,southern_africa,"salt, pepper",3600.0
+Botswana,Phane,Mopane worms,Boil → Dry or fry,30 min,Caterpillars,Protein,Seasonal,southern_africa,"salt, pepper",30.0
+Namibia,Oshifima,"Pearl millet, water",Cook stiff porridge,30 min,Sorghum,Staple,Northern Namibia,southern_africa,"salt, pepper",30.0
+Namibia,Efundja,Wild mushrooms,Dry → Rehydrate → Cook,25 min,Button mushrooms,Side,Seasonal,southern_africa,"salt, pepper",25.0
+Namibia,Ombidi,Mopane worms,Boil → Fry,30 min,Caterpillars,Protein,Indigenous,southern_africa,"salt, pepper",30.0
+Namibia,Vetkoek Filled,"Flour, yeast, oil",Fry dough → Fill,35 min,Jam/meat,Snack,Urban food,southern_africa,"salt, pepper",35.0
+Namibia,Kapana,"Beef strips, spices",Grill beef → Serve hot,25 min,Goat meat,Snack,Street food,southern_africa,"salt, pepper",25.0
+Namibia,Omutete,"Greens, soda ash",Boil leaves,20 min,Spinach,Side,Oshiwambo,southern_africa,"salt, pepper",20.0
+Namibia,Mahangu Porridge,Pearl millet,Cook porridge,20 min,Maize,Breakfast,Traditional,southern_africa,"salt, pepper",20.0
+Namibia,Sour Milk (Omaere),Milk,Natural fermentation,2–3 days,Yogurt,Beverage,Common dairy,southern_africa,"salt, pepper",3600.0
+Lesotho,Motoho,Fermented sorghum,Cook sour porridge,30 min,Maize,Breakfast,Fermented staple,southern_africa,"salt, pepper",30.0
+Lesotho,Likhobe,"Beans, maize",Boil together,60 min,Add pumpkin,Main,Mountain food,southern_africa,"salt, pepper",60.0
+Lesotho,Papa,Maize meal,Cook stiff porridge,25 min,Sorghum,Staple,Daily meal,southern_africa,"salt, pepper",25.0
+Lesotho,Moroho,Wild greens,Boil → Light fry,20 min,Spinach,Side,Indigenous,southern_africa,"salt, pepper",20.0
+Lesotho,Chakaka,Samp & beans,Boil until soft,90 min,Add meat,Main,Traditional,southern_africa,"salt, pepper",90.0
+Lesotho,Thope,Pumpkin leaves,Cook lightly,25 min,Kale,Side,Seasonal,southern_africa,"salt, pepper",25.0
+Lesotho,Mafura,Animal fat,Render fat,40 min,Oil substitute,Condiment,Preservation,southern_africa,"salt, pepper",40.0
+Lesotho,Maize Bread,Maize flour,Bake or steam,50 min,Wheat mix,Side,Rural staple,southern_africa,"salt, pepper",50.0
+Cameroon/Benin,Koki Beans,"Cowpeas (500g), palm oil (3 tbsp)",Grind beans → Steam in leaves,50 min,Add greens,Protein,Leaf-wrapped,west_africa,Salt,50.0
+Ghana,Waakye,"Rice (300g), beans (200g), dried sorghum leaves",Boil beans → Add rice & leaves → Cook together,60 min,Black beans,Main,Street staple,west_africa,Salt,60.0
+Ghana,Banku,Fermented maize dough (500g),Cook dough while stirring until elastic,30 min,Maize-only,Staple,Sour swallow,west_africa,Salt,30.0
+Nigeria,Egusi Soup,"Egusi seeds (200g), greens (300g), palm oil (3 tbsp)",Grind egusi → Fry lightly in palm oil → Add water → Simmer → Add greens,45 min,Pumpkin seeds,Main,Thick stew,west_africa,"Salt, chili",45.0
+Nigeria,Suya,"Beef (700g), groundnuts (100g), oil",Grind groundnuts & spices → Coat beef → Skewer & grill,30 min,Chicken version,Snack,Street grilled meat,west_africa,"Chili, ginger, salt",30.0
+Nigeria,Moi Moi,"Beans (500g), onion (1), oil (3 tbsp)",Soak & peel beans → Blend → Steam batter,50 min,Add egg/fish,Protein,Steamed pudding,west_africa,"Salt, pepper",50.0
+Nigeria,Okra Soup,"Okra (400g), palm oil (2 tbsp)",Chop okra → Simmer briefly → Add oil,30 min,Add fish,Side,Slippery texture,west_africa,Salt,30.0
+Nigeria,Ayamase,"Green peppers (6), palm oil (4 tbsp)",Blend peppers → Cook in oil until dark,40 min,Tomato version,Sauce,Served with rice,west_africa,Salt,40.0
+Nigeria,Efo Riro,"Leafy greens (400g), palm oil (3 tbsp)",Fry base → Add greens → Simmer,35 min,Spinach,Main,Yoruba staple,west_africa,"Salt, chili",35.0
+Nigeria,Pepper Soup,"Meat (700g), water",Boil meat with spices,45 min,Fish version,Soup,Medicinal,west_africa,Pepper soup spice,45.0
+Nigeria,Abacha,Cassava flakes (300g),Soak flakes → Mix with sauce,30 min,Add ugba,Side,Igbo dish,west_africa,Salt,30.0
+Nigeria,Akara,"Beans (400g), onion",Blend beans → Fry spoonfuls,25 min,Add pepper,Snack,Bean fritters,west_africa,Salt,25.0
+Nigeria/Ghana,Jollof Rice,"Rice (500g), tomatoes (4), onion (2), oil (4 tbsp)",Blend tomatoes & onion → Fry in oil until thick → Add spices → Add washed rice & water → Cover and simmer until rice is cooked,50 min,Chicken/veg versions,Main,Party & everyday food,west_africa,"Garlic, thyme, bay leaf, salt, chili",50.0
+Senegal,Yassa Poulet,"Chicken (1 kg), onion (4), lemon juice",Marinate chicken → Cook onions → Add chicken,60 min,Fish version,Main,Tangy,west_africa,"Pepper, salt",60.0
+Senegal/Mali,Groundnut Soup,"Groundnut paste (200g), tomato (3), onion (1)",Fry onion → Add tomato → Add groundnut paste & water → Simmer,45 min,Peanut butter,Main,Sahel-wide dish,west_africa,Salt,45.0
+Senegal/Mali,Mafe,"Beef (800g), groundnut paste (200g)",Stew beef → Add peanut sauce,60 min,Veg version,Main,Creamy,west_africa,Salt,60.0
+West Africa,Plantain Chips,"Plantain (3), oil",Slice thin → Fry,15 min,Baked,Snack,Street food,west_africa,Salt,15.0
+Ghana,Palm Nut Soup,Palm fruits (500g),Boil & extract palm cream → Cook soup,60 min,Canned palm cream,Main,Rich soup,west_africa,Salt,60.0
+Nigeria,Fried Yam,"Yam (500g), oil",Slice → Fry,20 min,Oven bake,Snack,Evening food,west_africa,Salt,20.0
+Benin/Togo,Gbofloto,"Flour (500g), yeast",Fry dough balls,30 min,Sweet fritters,Snack,Street snack,west_africa,Sugar,30.0
+Nigeria,Banga Soup,Palm fruit extract (300ml),Simmer palm extract with spices,50 min,Palm oil alt,Main,Niger Delta,west_africa,Salt,50.0
+Ghana,Tilapia Stew,"Tilapia (1), tomato (3)",Fry fish → Simmer sauce,40 min,Sardines,Main,Coastal,west_africa,Salt,40.0
+Sierra Leone,Cassava Leaf Stew,Cassava leaves (400g),Pound leaves → Simmer long,60 min,Spinach,Main,Labor-intensive,west_africa,Salt,60.0
+Nigeria,Rice and Beans,"Rice (300g), beans (200g)",Cook together,45 min,Coconut rice,Main,Everyday,west_africa,Salt,45.0
+Algeria,Chakchouka (Algerian),"Tomato, pepper, egg",Simmer vegetables → Add eggs,30 min,Meat version,Main,Shared Maghreb dish,north_africa,"Garlic, salt",30.0
+Algeria,Rechta,"Fresh noodles, chicken",Steam noodles → Serve with chicken stew,80 min,Veg stew,Main,Festive,north_africa,Salt,80.0
+Algeria,Loubia,"White beans (400g), tomato",Simmer beans in tomato sauce,60 min,Add carrots,Main,Winter dish,north_africa,"Garlic, salt",60.0
+Algeria,Kesra,"Semolina (500g), oil",Knead dough → Pan cook,30 min,Barley flour,Bread,Everyday bread,north_africa,Salt,30.0
+Algeria/Libya,Chorba,"Lamb (500g), tomato, grains",Simmer meat & grains,60 min,Chicken,Soup,Ramadan soup,north_africa,"Pepper, salt",60.0
+Egypt,Ful Medames,"Fava beans (500g), oil",Slow cook beans → Mash lightly → Drizzle oil,45 min,Lentils,Breakfast,Daily food,north_africa,"Garlic, salt",45.0
+Egypt,Koshari,"Rice, lentils, pasta",Cook components separately → Layer → Top with sauce,50 min,Chickpeas,Main,Urban staple,north_africa,"Garlic, salt",50.0
+Egypt,Ta’ameya,"Fava beans (400g), herbs",Blend beans & herbs → Fry patties,30 min,Chickpea falafel,Snack,Egyptian falafel,north_africa,"Garlic, coriander, salt",30.0
+Egypt,Molokhia,"Molokhia leaves (300g), broth",Simmer leaves briefly → Add garlic oil,30 min,Spinach substitute,Main,Slimy texture,north_africa,"Garlic, salt",30.0
+Egypt,Aish Baladi,Whole wheat flour (500g),Knead dough → Bake flatbread,35 min,Sorghum blend,Staple,Daily bread,north_africa,Salt,35.0
+Egypt,Basbousa,"Semolina (500g), sugar",Bake batter → Pour syrup,45 min,Yogurt version,Dessert,Popular dessert,north_africa,Coconut (optional),45.0
+Libya,Imbakbaka,"Pasta (400g), tomato, meat",Cook pasta in meat sauce,40 min,Veg version,Main,One-pot,north_africa,Salt,40.0
+Libya,Libyan Shorba,"Meat, tomato, herbs",Simmer until thick,50 min,Lentil base,Soup,Comfort food,north_africa,"Pepper, salt",50.0
+Libya/Tunisia,Baklava (Maghreb),"Phyllo, nuts, syrup",Layer pastry → Bake → Syrup,60 min,Pistachio/walnut,Dessert,Celebrations,north_africa,Cinnamon,60.0
+Maghreb,Merguez,Spiced sausages,Grill or pan-fry,20 min,Beef/lamb,Protein,Street food,north_africa,"Paprika, chili",20.0
+Maghreb,Mechoui,Whole lamb,Slow roast over fire,3–4 hrs,Oven roast,Main,Ceremonial,north_africa,Salt,210.0
+Morocco,Vegetable Tagine,"Mixed vegetables, onion (1), oil",Layer vegetables → Cover → Slow cook until tender,70 min,Add chickpeas,Main,Clay-pot cooking,north_africa,"Garlic, salt",70.0
+Morocco,Chicken Tagine with Olives,"Chicken (1kg), olives, onion",Brown chicken → Add onion & spices → Simmer with olives,75 min,Preserved lemon,Main,Family dish,north_africa,"Garlic, ginger, salt",75.0
+Morocco,Harira,"Lentils (200g), tomato (3), herbs",Simmer lentils & tomato → Thicken soup,60 min,Chickpeas added,Soup,Ramadan staple,north_africa,"Ginger, pepper, salt",60.0
+Morocco,Zaalouk,"Eggplant (2), tomato (2), oil",Roast eggplant → Mash with tomato & spices,30 min,Add peppers,Side,Cold salad,north_africa,"Garlic, paprika, salt",30.0
+Morocco,Taktouka,"Tomato, pepper",Cook vegetables → Mash lightly,25 min,Add chili,Side,Cold salad,north_africa,"Garlic, salt",25.0
+Morocco,Sfenz,"Flour, yeast",Fry airy dough rings,30 min,Sweet topping,Snack,Doughnut-like,north_africa,Sugar (optional),30.0
+Morocco/Algeria,Couscous,"Semolina (500g), mixed vegetables, oil",Steam semolina → Boil vegetables → Serve vegetables over couscous,60 min,Millet couscous,Main,Friday & ceremonial meal,north_africa,Salt,60.0
+Tunisia,Shakshouka,"Eggs (4), tomato (3), onion",Cook tomato sauce → Crack eggs → Cover,25 min,Add peppers,Breakfast,One-pan dish,north_africa,"Pepper, salt",25.0
+Tunisia,Lablabi,"Chickpeas (400g), garlic",Simmer chickpeas → Serve with bread,40 min,Add egg,Soup,Working-class food,north_africa,Salt,40.0
+Tunisia,Ojja,"Eggs, tomato, sausage",Cook sauce → Add sausage → Add eggs,30 min,Seafood ojja,Main,Spicy skillet,north_africa,"Chili, salt",30.0
+Tunisia,Brik,"Pastry sheets, egg, tuna",Fill pastry → Fry quickly,20 min,Potato filling,Snack,Street food,north_africa,Salt,20.0
+Tunisia/Algeria,Makroudh,"Semolina, dates",Fill dough → Fry or bake → Syrup,45 min,Honey glaze,Dessert,Festive,north_africa,Cinnamon,45.0
+Cameroon,Eru,"Eru leaves, waterleaf, palm oil",Boil leaves → Add oil & crayfish → Simmer,60 min,Spinach,Main,Highly valued,central_africa,"Crayfish, salt",60.0
+Cameroon,Ndolé,"Bitterleaf (400g), groundnuts (200g)",Boil leaves → Add peanut paste → Simmer,75 min,Spinach substitute,Main,National dish,central_africa,"Crayfish, salt",75.0
+Cameroon,Koki Beans,"Cowpeas, palm oil",Grind beans → Steam in leaves,50 min,Foil wrap,Protein,Ceremonial,central_africa,Salt,50.0
+Cameroon,Achu Soup,"Cocoyam, palm oil",Boil cocoyam → Pound → Serve with soup,60 min,Yam substitute,Main,Western Cameroon,central_africa,Salt,60.0
+Cameroon,Mbanga Soup,"Palm nut extract, meat",Extract palm cream → Simmer with meat,70 min,Palm oil,Main,Rich soup,central_africa,Salt,70.0
+CAR,Egusi Soup (Central African),"Melon seeds, greens",Grind seeds → Cook with greens,45 min,Pumpkin seeds,Main,Regional variant,central_africa,Salt,45.0
+Central Africa,Fried Plantain,"Ripe plantain, oil",Slice → Fry,15 min,Baked,Snack,Universal snack,central_africa,Salt,15.0
+Central Africa,Smoked Fish Stew,"Smoked fish, tomato",Rehydrate fish → Simmer,40 min,Fresh fish,Main,Preservation-based,central_africa,Salt,40.0
+Central Africa,Groundnut Sauce,"Groundnuts, water",Grind peanuts → Simmer into sauce,25 min,Peanut butter,Sauce,Widely used,central_africa,Salt,25.0
+Central Africa,Boiled Cocoyam,"Cocoyam, water",Peel → Boil until soft,35 min,Yam,Staple,Root staple,central_africa,Salt,35.0
+Chad,Goat Meat Stew,"Goat meat, onion",Simmer meat until tender,90 min,Beef,Main,Sahel influence,central_africa,Salt,90.0
+Chad,Daraba,"Okra, tomato, oil",Simmer okra with tomato,30 min,Add meat,Side,Slimy stew,central_africa,Salt,30.0
+Congo,Pondu,"Cassava leaves, groundnuts",Boil leaves → Add groundnut paste → Simmer,55 min,Peanut butter,Main,Nutty variation,central_africa,Salt,55.0
+Congo,Liboké ya Mbisi,"Fish (1), onion, tomato",Wrap seasoned fish in leaves → Steam,40 min,Foil wrap,Main,Leaf-steamed,central_africa,Salt,40.0
+Congo Basin,Bushmeat Stew,"Game meat, onion",Simmer meat until tender,90 min,Goat meat,Main,Forest-based,central_africa,Salt,90.0
+Congo Basin,Steamed Leaf Parcels,"Leaves, veg mix",Wrap filling in leaves → Steam,30 min,Foil,Side,Traditional technique,central_africa,Salt,30.0
+DRC,Mbika,"Pumpkin seeds (200g), greens",Grind seeds → Simmer with greens,45 min,Egusi substitute,Main,Protein-rich,central_africa,Salt,45.0
+DRC,Makayabu Stew,"Salted fish, tomato, onion",Soak fish → Simmer in tomato sauce,35 min,Fresh fish,Main,Preservation-based,central_africa,Salt,35.0
+DRC,Roasted Caterpillars,"Caterpillars, oil",Clean → Roast or fry,20 min,Dry & store,Protein,Seasonal delicacy,central_africa,Salt,20.0
+Equatorial Guinea,Odika Stew,"Mango seeds (200g), meat",Grind seeds → Simmer with meat,50 min,Egusi seeds,Main,Seed-based stew,central_africa,Salt,50.0
+Gabon,Gnetum Stew (Eru-style),"Okok leaves, palm oil",Boil leaves → Add oil & seasoning,45 min,Spinach,Main,Forest food,central_africa,"Crayfish, salt",45.0
+Gabon,Poulet Nyembwe,"Chicken, palm nut cream",Cook chicken → Add palm cream → Simmer,60 min,Palm oil,Main,National dish,central_africa,Salt,60.0

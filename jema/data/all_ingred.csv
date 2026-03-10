@@ -1,0 +1,192 @@
+,ingredient,kcal per 100g,category
+0,White rice (cooked),130.0,cooked
+1,Brown rice (cooked),123.0,cooked
+2,"Rice (parboiled, cooked)",123.0,cooked
+3,Pasta (cooked),158.0,cooked
+4,Spaghetti (cooked),157.0,cooked
+5,Couscous (cooked),112.0,cooked
+6,Quinoa (cooked),120.0,cooked
+7,Ugali (cooked maize meal),110.0,cooked
+8,Maize porridge (thin),70.0,cooked
+9,Maize porridge (thick),95.0,cooked
+10,Githeri (maize and beans cooked),120.0,cooked
+11,Matoke (steamed green banana mashed),110.0,cooked
+12,Plantain (boiled),116.0,cooked
+13,Cassava (boiled),160.0,cooked
+14,Yam (boiled),116.0,cooked
+15,Arrowroots (boiled),98.0,cooked
+16,Sweet potatoes (boiled),86.0,cooked
+17,Potatoes (boiled),87.0,cooked
+18,Beans (boiled),127.0,cooked
+19,Black beans (boiled),132.0,cooked
+20,Kidney beans (boiled),127.0,cooked
+21,Lentils (boiled),116.0,cooked
+22,Chickpeas (boiled),164.0,cooked
+23,Green grams / mung beans (boiled),105.0,cooked
+24,Cowpeas (boiled),116.0,cooked
+25,Pigeon peas (boiled),118.0,cooked
+26,Fava beans (boiled),110.0,cooked
+27,Collard greens / Sukuma wiki (cooked),33.0,cooked
+28,Spinach (cooked),23.0,cooked
+29,Amaranth leaves (cooked),21.0,cooked
+30,Pumpkin leaves (cooked),35.0,cooked
+31,Cowpea leaves (cooked),38.0,cooked
+32,Spider plant leaves (cooked),45.0,cooked
+33,Cassava leaves (cooked),90.0,cooked
+34,Cabbage (cooked),23.0,cooked
+35,Okra (cooked),33.0,cooked
+36,"Chicken (cooked, no skin)",165.0,cooked
+37,Chicken (fried),220.0,cooked
+38,Beef (stewed),250.0,cooked
+39,Goat meat (cooked),180.0,cooked
+40,Lamb (cooked),294.0,cooked
+41,Fish (cooked),206.0,cooked
+42,Tilapia (cooked),129.0,cooked
+43,Small dried fish (cooked),290.0,cooked
+44,Eggs (boiled),155.0,cooked
+45,Fried egg        ,196.0,cooked
+46,Coconut milk (average cooking dilution),180.0,cooked
+47,Coconut rice (cooked),190.0,cooked
+48,Beans in coconut stew,210.0,cooked
+0,Apple (fresh edible) ,52.0,fruits
+1,Banana (ripe fresh) ,89.0,fruits
+2,Orange (fresh edible) ,47.0,fruits
+3,Pineapple (fresh edible) ,50.0,fruits
+4,Mango (ripe fresh) ,60.0,fruits
+5,Papaya (ripe fresh) ,43.0,fruits
+6,Watermelon (fresh edible flesh) ,30.0,fruits
+7,Avocado (fresh edible) ,160.0,fruits
+8,Grapes (fresh),69.0,fruits
+9,Strawberries (fresh) ,32.0,fruits
+10,Blueberries (fresh) ,57.0,fruits
+11,Raspberries (fresh) ,52.0,fruits
+12,Pear (fresh) ,57.0,fruits
+13,Peach (fresh) ,39.0,fruits
+14,Plum (fresh) ,46.0,fruits
+15,Kiwi (fresh) ,61.0,fruits
+16,Pomegranate (fresh arils) ,83.0,fruits
+17,Guava (fresh ripe) ,68.0,fruits
+18,Passion fruit (fresh pulp) ,97.0,fruits
+19,Dragon fruit (fresh pulp) ,50.0,fruits
+20,African pear / Safou (fresh) ,215.0,fruits
+21,Baobab fruit pulp (dry natural edible) ,250.0,fruits
+22,Dates (dry edible) ,277.0,fruits
+23,Figs (dry edible),249.0,fruits
+24,Raisins,299.0,fruits
+0,Yoghurt (plain whole) ,61.0,snacks
+1,Fermented milk (mala / amasi) ,64.0,snacks
+2,Cheese (hard average) ,402.0,snacks
+3,Bread (white wheat) ,265.0,snacks
+4,Brown bread ,247.0,snacks
+5,Chapati (plain) ,300.0,snacks
+6,Mandazi ,350.0,snacks
+7,Doughnut (fried) ,452.0,snacks
+8,Biscuits (plain) ,502.0,snacks
+9,Chocolate (milk) ,535.0,snacks
+10,Chocolate (dark) ,598.0,snacks
+11,Peanut butter ,588.0,snacks
+12,Honey ,304.0,snacks
+13,Sugar (white) ,387.0,snacks
+14,Sugar (brown) ,380.0,snacks
+15,Ice cream (vanilla) ,207.0,snacks
+16,Granola bar ,471.0,snacks
+17,Potato crisps / chips ,536.0,snacks
+18,Popcorn (plain air popped) ,387.0,snacks
+19,Roasted groundnuts ,585.0,snacks
+20,Trail mix (nuts + dried fruit avg) ,450.0,snacks
+0,Maize (dry),360.0,raw
+1,Maize flour,360.0,raw
+2,Cassava (raw),160.0,raw
+3,Cassava flour (gari),350.0,raw
+4,Yam (raw),118.0,raw
+5,Yam flour,340.0,raw
+6,"Rice (white, dry)",365.0,raw
+7,"Rice (white, cooked)",130.0,raw
+8,Brown rice (dry),370.0,raw
+9,Sorghum flour,329.0,raw
+10,Millet flour,378.0,raw
+11,Teff flour,367.0,raw
+12,Fonio (dry),360.0,raw
+13,Semolina flour,360.0,raw
+14,Couscous (dry),376.0,raw
+15,Wheat flour (white),364.0,raw
+16,Whole wheat flour,340.0,raw
+17,Oats (dry),389.0,raw
+18,Barley (dry),354.0,raw
+19,Quinoa (dry),368.0,raw
+21,Beans (dry),336.0,raw
+22,Black beans (dry),339.0,raw
+23,Kidney beans (dry),333.0,raw
+24,Lentils (dry),352.0,raw
+25,Chickpeas (dry),364.0,raw
+26,Chickpeas (cooked),164.0,raw
+27,Cowpeas (dry),336.0,raw
+28,Green grams (mung beans),347.0,raw
+29,Pigeon peas (dry),343.0,raw
+30,Bambara groundnuts (dry),367.0,raw
+32,Groundnuts (raw),567.0,raw
+33,Groundnut paste,588.0,raw
+34,Peanut butter,588.0,raw
+35,Sesame seeds,573.0,raw
+36,Tigernuts (dry),450.0,raw
+37,Egusi seeds,560.0,raw
+38,Almonds (raw),579.0,raw
+39,Cashew nuts (raw),553.0,raw
+40,Walnuts,654.0,raw
+42,Palm oil,884.0,raw
+43,Red palm oil,884.0,raw
+44,Vegetable oil,884.0,raw
+45,Olive oil,884.0,raw
+46,Sunflower oil,884.0,raw
+47,Peanut oil,884.0,raw
+48,Butter,717.0,raw
+49,Ghee,900.0,raw
+50,Margarine,717.0,raw
+52,Beef (raw),250.0,raw
+53,Goat meat (raw),143.0,raw
+54,Lamb (raw),294.0,raw
+55,Mutton (raw),294.0,raw
+56,Pork (raw),242.0,raw
+57,Chicken (raw),239.0,raw
+58,Indigenous chicken (raw),215.0,raw
+59,Turkey (raw),189.0,raw
+60,Camel meat,160.0,raw
+61,Fish (fresh average),206.0,raw
+62,Tuna (fresh),132.0,raw
+63,Salmon (fresh),208.0,raw
+64,Small dried fish,290.0,raw
+65,Dried crayfish,290.0,raw
+66,Smoked fish,290.0,raw
+67,Octopus,164.0,raw
+68,Eggs (whole raw),155.0,raw
+70,Milk (whole),61.0,raw
+71,Cheese (cheddar average),402.0,raw
+72,Cream (heavy),340.0,raw
+73,Coconut milk (thick),230.0,raw
+74,Coconut paste,354.0,raw
+75,Potatoes (raw),77.0,raw
+76,Sweet potatoes (raw),86.0,raw
+77,Arrowroots,65.0,raw
+78,Green bananas (raw),122.0,raw
+79,Plantain (ripe raw),122.0,raw
+80,Plantain (unripe raw),120.0,raw
+82,Onion,40.0,raw
+83,Tomato,18.0,raw
+84,Garlic,149.0,raw
+85,Ginger,80.0,raw
+86,Chili pepper,40.0,raw
+87,Okra (raw),33.0,raw
+88,Okra (dried),250.0,raw
+89,Spinach,23.0,raw
+90,Kale,35.0,raw
+91,Cabbage,25.0,raw
+92,Pumpkin leaves,49.0,raw
+93,Cowpea leaves,44.0,raw
+94,Amaranth leaves,23.0,raw
+95,Cassava leaves,91.0,raw
+96,Jute mallow leaves,49.0,raw
+97,Salt,0.0,raw
+98,Water,0.0,raw
+99,Black tea (brewed),1.0,raw
+100,Coffee (brewed),2.0,raw
+101,Stock cube,260.0,raw

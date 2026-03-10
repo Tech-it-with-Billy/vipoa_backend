@@ -1,0 +1,24 @@
+class RewardClaimStatus:
+    PENDING = "PENDING"
+    VERIFIED = "VERIFIED"
+    APPLIED = "APPLIED"
+    REJECTED = "REJECTED"
+    REVERSED = "REVERSED"
+
+    CHOICES = [
+        (PENDING, "Pending"),
+        (VERIFIED, "Verified"),
+        (APPLIED, "Applied"),
+        (REJECTED, "Rejected"),
+        (REVERSED, "Reversed"),
+    ]
+
+
+class RewardEventType:
+    PROFILE_COMPLETION = "PROFILE_COMPLETION"
+    SURVEY_COMPLETION = "SURVEY_COMPLETION"
+    SHARE_CONFIRMED = "SHARE_CONFIRMED"
+    REVIEW_APPROVED = "REVIEW_APPROVED"
+    CHALLENGE_COMPLETED = "CHALLENGE_COMPLETED"
+    STREAK_DAILY = "STREAK_DAILY"
+    STREAK_WEEKLY = "STREAK_WEEKLY"
