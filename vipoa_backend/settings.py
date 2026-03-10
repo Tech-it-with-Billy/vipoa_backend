@@ -1,32 +1,26 @@
 import os
 from pathlib import Path
 
-# ``python-dotenv`` is an optional dependency used during development.  If it
-# isn't installed (for example in a clean test environment) we simply skip
-# loading the `.env` file rather than raising an ImportError.
 try:
     from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - dependency not required in tests
+except ImportError:
     load_dotenv = lambda *args, **kwargs: None
 
 import dj_database_url
 
-# read environment variables from a local .env file when present (development)
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ``SECRET_KEY`` must be provided by the environment in production.  A
-# fallback is only for development; do **not** commit a real secret key.
+
+# -----------------------------
+# SECURITY
+# -----------------------------
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
 
-# ``DEBUG`` should be explicitly toggled via the environment. Railway will
-# typically set DEBUG=False in production.
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("1", "true", "yes")
 
-# Allow hosts can be injected from Railway; we provide a reasonable default
-# for local development.  Railway sets ``ALLOWED_HOSTS`` as a comma-separated
-# list in its environment variables if you configure it that way.
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
     "api.vipoa.africa,vipoa.africa,127.0.0.1,localhost",
@@ -35,14 +29,39 @@ ALLOWED_HOSTS = os.environ.get(
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-GOOGLE_CLIENT_ID = "your-google-client-id"
+SECURE_SSL_REDIRECT = not DEBUG
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+
+
+# -----------------------------
+# THIRD PARTY KEYS
+# -----------------------------
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+
+
+# -----------------------------
+# CSRF
+# -----------------------------
 
 CSRF_TRUSTED_ORIGINS = [
     "https://api.vipoa.africa",
     "https://vipoa.africa",
 ]
 
+
+# -----------------------------
+# APPLICATIONS
+# -----------------------------
+
 INSTALLED_APPS = [
+
     # Django
     "django.contrib.admin",
     "django.contrib.auth",
@@ -52,128 +71,245 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
 
-    # 3rd Party
+    # Third Party
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
-    "drf_yasg",        # <-- Required for Swagger
+    "drf_yasg",
 
-
-
-    # Your apps
+    # Local Apps
     "accounts",
     "api",
     "jema",
-    'products',
-    'reviews',
+    "products",
+    "reviews",
     "profiles.apps.ProfilesConfig",
-    'surveys',
-    'diary',
-    # 'poa_points',
-    'rewards'
-    
+    "surveys",
+    "diary",
+    "rewards",
 ]
 
 SITE_ID = 1
 
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-}
+
+# -----------------------------
+# AUTHENTICATION
+# -----------------------------
+
+AUTH_USER_MODEL = "accounts.User"
+
 AUTHENTICATION_BACKENDS = [
     "accounts.admin_backend.SuperUserOnlyBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-AUTH_USER_MODEL = "accounts.User"
 LOGIN_URL = "/admin/login/"
 
+
+# -----------------------------
+# DJANGO REST FRAMEWORK
+# -----------------------------
+
+REST_FRAMEWORK = {
+
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+
+# -----------------------------
+# MIDDLEWARE
+# -----------------------------
+
 MIDDLEWARE = [
+
     "django.middleware.security.SecurityMiddleware",
+
     "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
 
-    # CORS
     "corsheaders.middleware.CorsMiddleware",
 
     "django.middleware.common.CommonMiddleware",
+
     "django.middleware.csrf.CsrfViewMiddleware",
+
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 
-    # REQUIRED FOR DJANGO-ALLAUTH
-    
-
     "django.contrib.messages.middleware.MessageMiddleware",
+
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+
+# -----------------------------
+# CORS
+# -----------------------------
+
+CORS_ALLOWED_ORIGINS = [
+    "https://vipoa.africa",
+    "https://www.vipoa.africa",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+
+# -----------------------------
+# URLS
+# -----------------------------
 
 ROOT_URLCONF = "vipoa_backend.urls"
+
+
+# -----------------------------
+# TEMPLATES
+# -----------------------------
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
+
         "DIRS": [],
+
         "APP_DIRS": True,
+
         "OPTIONS": {
+
             "context_processors": [
+
                 "django.template.context_processors.debug",
+
                 "django.template.context_processors.request",
+
                 "django.contrib.auth.context_processors.auth",
+
                 "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
+
+# -----------------------------
+# WSGI
+# -----------------------------
+
 WSGI_APPLICATION = "vipoa_backend.wsgi.application"
 
-# ``dj_database_url.config`` will return an ``{}`` if no database URL is
-# provided, so we supply a hard-coded sqlite entry for local development.
+
+# -----------------------------
+# DATABASE
+# -----------------------------
+
 DATABASES = {
+
     "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+
+        default=os.environ.get(
+            "DATABASE_URL",
+            f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+        ),
+
+        conn_max_age=600,
+
+        ssl_require=not DEBUG
     )
 }
 
+
+# -----------------------------
+# STATIC FILES
+# -----------------------------
+
 STATIC_URL = "/static/"
+
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-# Use whitenoise's compressed manifest storage so that static assets are
-# cached efficiently in production.  It requires running collectstatic during
-# build.
+
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Remove STATICFILES_DIRS because static/ does NOT exist
-# STATICFILES_DIRS = [ BASE_DIR / "static" ]
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# -----------------------------
+# MEDIA FILES
+# -----------------------------
 
+MEDIA_URL = "/media/"
+
+MEDIA_ROOT = BASE_DIR / "media"
+
+
+# -----------------------------
+# DEFAULT FIELD
+# -----------------------------
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Swagger (superuser-only)
+
+# -----------------------------
+# SWAGGER
+# -----------------------------
+
 SWAGGER_SETTINGS = {
+
     "USE_SESSION_AUTH": True,
+
     "LOGIN_URL": "/admin/login/",
+
     "SECURITY_DEFINITIONS": {
+
         "TokenAuth": {
+
             "type": "apiKey",
+
             "in": "header",
+
             "name": "Authorization",
         }
     },
 }
 
-# Django-Allauth
+
+# -----------------------------
+# DJANGO ALLAUTH
+# -----------------------------
+
 ACCOUNT_EMAIL_VERIFICATION = "none"
+
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+
 ACCOUNT_EMAIL_REQUIRED = True
+
 ACCOUNT_USERNAME_REQUIRED = True
 
+
+# -----------------------------
+# LOGGING
+# -----------------------------
+
+LOGGING = {
+
+    "version": 1,
+
+    "disable_existing_loggers": False,
+
+    "handlers": {
+
+        "console": {
+
+            "class": "logging.StreamHandler",
+        },
+    },
+
+    "root": {
+
+        "handlers": ["console"],
+
+        "level": "INFO",
+    },
+}
