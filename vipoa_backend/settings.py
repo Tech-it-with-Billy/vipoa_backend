@@ -23,7 +23,7 @@ DEBUG = os.environ.get("DEBUG", "False").lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
-    "api.vipoa.africa,vipoa.africa,127.0.0.1,localhost", ".railway.app",
+    "api.vipoa.africa,vipoa.africa,127.0.0.1,localhost",
 ).split(",")
 
 USE_X_FORWARDED_HOST = True
