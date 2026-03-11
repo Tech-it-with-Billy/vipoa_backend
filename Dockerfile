@@ -29,7 +29,4 @@ RUN python manage.py collectstatic --noinput
 EXPOSE 8080
 
 # Run migrations, create superuser (via custom command), and start Gunicorn
-# CMD ["sh", "-c", "python manage.py migrate && gunicorn vipoa_backend.wsgi:application --bind 0.0.0.0:$PORT"]
-CMD python manage.py migrate --noinput && \
-    python create_superuser.py && \
-    gunicorn vipoa_backend.wsgi:application --bind 0.0.0.0:8000
+CMD ["sh", "-c", "python manage.py migrate && gunicorn vipoa_backend.wsgi:application --bind 0.0.0.0:$PORT"]
