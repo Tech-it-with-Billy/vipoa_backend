@@ -158,6 +158,8 @@ MIDDLEWARE = [
 # -----------------------------
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:59601",
+    "http://127.0.0.1:59601",
     "https://vipoa.africa",
     "https://www.vipoa.africa",
 ]
