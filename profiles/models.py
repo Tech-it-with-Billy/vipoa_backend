@@ -12,7 +12,6 @@ def profile_avatar_upload_path(instance, filename: str) -> str:
 
 
 PROFILE_COMPLETION_FIELDS = [
-    "name",
     "gender",
     "dob",
     "location",
@@ -130,6 +129,14 @@ class Profile(models.Model):
             return "Overweight"
         else:
             return "Obese"
+    
+    @property
+    def user_name(self):
+        return self.user.full_name
+
+    @property
+    def user_email(self):
+        return self.user.email
 
     def __str__(self):
         return f"Profile(user_id={self.user_id})"

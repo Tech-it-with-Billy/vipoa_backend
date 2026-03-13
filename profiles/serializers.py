@@ -28,6 +28,8 @@ PROFILE_FIELDS = [
 
 
 class ProfileReadSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="user.name", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
     poa_points = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     bmi = serializers.SerializerMethodField()
