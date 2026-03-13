@@ -58,7 +58,18 @@ class Profile(models.Model):
     # -----------------------------
     # GAMIFICATION
     # -----------------------------
+    # poa_points is now a property reflecting the wallet balance
     poa_points = models.IntegerField(default=0)
+
+    @property
+    def poa_points(self):
+        # Avoid circular import by importing here
+        from rewards.models.wallet import PoaPointsAccount
+        try:
+            wallet = PoaPointsAccount.objects.get(user=self.user)
+            return wallet.balance
+        except PoaPointsAccount.DoesNotExist:
+            return 0
     day_streak = models.IntegerField(default=0)
     profile_completed_awarded = models.BooleanField(default=False)
 
