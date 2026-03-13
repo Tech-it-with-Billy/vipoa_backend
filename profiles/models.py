@@ -6,6 +6,9 @@ from .constants import PROFILE_COMPLETION_FIELDS
 
 User = get_user_model()
 
+def profile_avatar_upload_path(instance, filename: str) -> str:
+    return f"profiles/{instance.user_id}/avatar/{filename}"
+
 
 class Profile(models.Model):
 
