@@ -29,10 +29,13 @@ langgraph-checkpoint==3.0.1
 langgraph-prebuilt==1.0.4
 langgraph-sdk==0.2.9
 langsmith==0.4.44
+numpy
 openai==2.8.1
+openpyxl
 orjson==3.11.4
 ormsgpack==1.12.0
 packaging==25.0
+pandas
 pillow==12.0.0
 psycopg2-binary==2.9.11
 pyasn1==0.6.1
