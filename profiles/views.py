@@ -38,8 +38,20 @@ class ProfileMeView(APIView):
 
         profile.refresh_from_db()
 
-        # 🔒 Backend decides if reward applies
-        award_profile_completion(user=request.user)
+        # Award points if eligible
+        result = award_profile_completion(user=request.user)
+
+        # If profile is now complete and not already marked as awarded, update flag and sync poa_points
+        if profile.is_profile_complete() and not profile.profile_completed_awarded:
+            # Try to get wallet balance
+            try:
+                wallet = getattr(request.user, "poa_wallet", None)
+                if wallet:
+                    profile.poa_points = wallet.balance
+            except Exception:
+                pass
+            profile.profile_completed_awarded = True
+            profile.save(update_fields=["profile_completed_awarded", "poa_points"])
 
         return Response(
             ProfileReadSerializer(profile).data,
@@ -84,7 +96,17 @@ class ProfileUpdateView(APIView):
         serializer.save()
         profile.refresh_from_db()
 
-        award_profile_completion(user=request.user)
+        result = award_profile_completion(user=request.user)
+
+        if profile.is_profile_complete() and not profile.profile_completed_awarded:
+            try:
+                wallet = getattr(request.user, "poa_wallet", None)
+                if wallet:
+                    profile.poa_points = wallet.balance
+            except Exception:
+                pass
+            profile.profile_completed_awarded = True
+            profile.save(update_fields=["profile_completed_awarded", "poa_points"])
 
         return Response(ProfileReadSerializer(profile).data, status=status.HTTP_200_OK)
 
