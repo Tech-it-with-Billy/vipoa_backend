@@ -9,13 +9,10 @@ from .serializers import (
     ProfileCompletionStatusSerializer,
 )
 
-# Rewards engine (single source of truth)
 from rewards.services.events import award_profile_completion
+from rewards.models.wallet import PoaPointsAccount
 
 
-# --------------------------------------------------
-# PROFILE: GET + UPDATE CURRENT USER PROFILE
-# --------------------------------------------------
 class ProfileMeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -26,6 +23,7 @@ class ProfileMeView(APIView):
         )
 
     def patch(self, request):
+
         profile = request.user.profile
 
         serializer = ProfileUpdateSerializer(
@@ -33,25 +31,30 @@ class ProfileMeView(APIView):
             data=request.data,
             partial=True,
         )
+
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
         profile.refresh_from_db()
 
-        # Award points if eligible
-        result = award_profile_completion(user=request.user)
+        # Only trigger reward if profile is complete
+        if profile.is_profile_complete():
 
-        # If profile is now complete and not already marked as awarded, update flag and sync poa_points
-        if profile.is_profile_complete() and not profile.profile_completed_awarded:
-            # Try to get wallet balance
-            try:
-                wallet = getattr(request.user, "poa_wallet", None)
+            result = award_profile_completion(user=request.user)
+
+            if result.outcome == "APPLIED":
+
+                wallet = PoaPointsAccount.objects.filter(user=request.user).first()
+
                 if wallet:
                     profile.poa_points = wallet.balance
-            except Exception:
-                pass
-            profile.profile_completed_awarded = True
-            profile.save(update_fields=["profile_completed_awarded", "poa_points"])
+
+                profile.profile_completed_awarded = True
+
+                profile.save(update_fields=[
+                    "profile_completed_awarded",
+                    "poa_points"
+                ])
 
         return Response(
             ProfileReadSerializer(profile).data,
@@ -59,15 +62,14 @@ class ProfileMeView(APIView):
         )
 
 
-# --------------------------------------------------
-# PROFILE COMPLETION STATUS (CRITICAL DEBUG ENDPOINT)
-# --------------------------------------------------
 class ProfileCompletionStatusView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+
         profile = request.user.profile
         missing = profile.missing_completion_fields()
+
         completed = len(PROFILE_COMPLETION_FIELDS) - len(missing)
         total = len(PROFILE_COMPLETION_FIELDS)
 
@@ -83,32 +85,46 @@ class ProfileCompletionStatusView(APIView):
         )
 
 
-# --------------------------------------------------
-# LEGACY UPDATE VIEW (BACKWARD COMPAT)
-# --------------------------------------------------
 class ProfileUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request):
+
         profile = request.user.profile
-        serializer = ProfileUpdateSerializer(profile, data=request.data, partial=True)
+
+        serializer = ProfileUpdateSerializer(
+            profile,
+            data=request.data,
+            partial=True,
+        )
+
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
         profile.refresh_from_db()
 
-        result = award_profile_completion(user=request.user)
+        if profile.is_profile_complete():
 
-        if profile.is_profile_complete() and not profile.profile_completed_awarded:
-            try:
-                wallet = getattr(request.user, "poa_wallet", None)
+            result = award_profile_completion(user=request.user)
+
+            if result.outcome == "APPLIED":
+
+                wallet = PoaPointsAccount.objects.filter(user=request.user).first()
+
                 if wallet:
                     profile.poa_points = wallet.balance
-            except Exception:
-                pass
-            profile.profile_completed_awarded = True
-            profile.save(update_fields=["profile_completed_awarded", "poa_points"])
 
-        return Response(ProfileReadSerializer(profile).data, status=status.HTTP_200_OK)
+                profile.profile_completed_awarded = True
+
+                profile.save(update_fields=[
+                    "profile_completed_awarded",
+                    "poa_points"
+                ])
+
+        return Response(
+            ProfileReadSerializer(profile).data,
+            status=status.HTTP_200_OK,
+        )
 
     def put(self, request):
         return self.patch(request)
