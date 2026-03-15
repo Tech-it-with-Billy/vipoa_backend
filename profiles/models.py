@@ -9,21 +9,14 @@ User = get_user_model()
 def profile_avatar_upload_path(instance, filename: str) -> str:
     return f"profiles/{instance.user_id}/avatar/{filename}"
 
-
 class Profile(models.Model):
-
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name="profile",
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
 
     # -----------------------------
     # BASIC INFO
     # -----------------------------
     name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True)
-
     gender = models.CharField(max_length=50, blank=True)
     dob = models.DateField(null=True, blank=True)
     location = models.CharField(max_length=255, blank=True)
@@ -35,10 +28,8 @@ class Profile(models.Model):
     current_height_cm = models.FloatField(null=True, blank=True)
     target_weight_kg = models.FloatField(null=True, blank=True)
     target_height_cm = models.FloatField(null=True, blank=True)
-
     goal = models.CharField(max_length=100, blank=True)
     activity_level = models.CharField(max_length=50, blank=True)
-
     eating_realities = models.TextField(blank=True)
     medical_restrictions = models.TextField(blank=True)
     allergies = models.TextField(blank=True)
@@ -58,11 +49,20 @@ class Profile(models.Model):
     # -----------------------------
     # GAMIFICATION
     # -----------------------------
-    poa_points = models.IntegerField(default=0)
     day_streak = models.IntegerField(default=0)
     profile_completed_awarded = models.BooleanField(default=False)
 
     updated_at = models.DateTimeField(auto_now=True)
+
+    # -----------------------------
+    # WALLET BALANCE (property)
+    # -----------------------------
+    @property
+    def poa_points(self):
+        try:
+            return self.user.poa_wallet.balance
+        except Exception:
+            return 0
 
     # -----------------------------
     # AGE
@@ -72,11 +72,7 @@ class Profile(models.Model):
         if not self.dob:
             return None
         today = date.today()
-        return (
-            today.year
-            - self.dob.year
-            - ((today.month, today.day) < (self.dob.month, self.dob.day))
-        )
+        return today.year - self.dob.year - ((today.month, today.day) < (self.dob.month, self.dob.day))
 
     # -----------------------------
     # BMI
@@ -85,7 +81,6 @@ class Profile(models.Model):
     def bmi(self):
         if not self.current_weight_kg or not self.current_height_cm:
             return None
-
         height_m = self.current_height_cm / 100
         return round(self.current_weight_kg / (height_m ** 2), 2)
 
@@ -95,7 +90,6 @@ class Profile(models.Model):
     @property
     def bmi_category(self):
         bmi = self.bmi
-
         if bmi is None:
             return None
         if bmi < 18.5:
@@ -111,63 +105,38 @@ class Profile(models.Model):
     # -----------------------------
     @property
     def bmr(self):
-
         if not self.current_weight_kg or not self.current_height_cm or not self.age:
             return None
-
         if self.gender.lower() == "male":
-            return (
-                10 * self.current_weight_kg
-                + 6.25 * self.current_height_cm
-                - 5 * self.age
-                + 5
-            )
-
-        return (
-            10 * self.current_weight_kg
-            + 6.25 * self.current_height_cm
-            - 5 * self.age
-            - 161
-        )
+            return 10 * self.current_weight_kg + 6.25 * self.current_height_cm - 5 * self.age + 5
+        return 10 * self.current_weight_kg + 6.25 * self.current_height_cm - 5 * self.age - 161
 
     # -----------------------------
     # TDEE
     # -----------------------------
     @property
     def tdee(self):
-
         bmr = self.bmr
         if not bmr:
             return None
-
         activity_multipliers = {
             "sedentary": 1.2,
             "light": 1.375,
             "moderate": 1.55,
             "very_active": 1.725,
         }
-
-        multiplier = activity_multipliers.get(
-            self.activity_level.lower() if self.activity_level else "", 1.2
-        )
-
+        multiplier = activity_multipliers.get(self.activity_level.lower() if self.activity_level else "", 1.2)
         return round(bmr * multiplier)
 
     # -----------------------------
     # PROFILE COMPLETION
     # -----------------------------
     def missing_completion_fields(self):
-
         missing = []
-
         for field in PROFILE_COMPLETION_FIELDS:
             value = getattr(self, field)
-
-            if value is None:
+            if value is None or (isinstance(value, str) and not value.strip()):
                 missing.append(field)
-            elif isinstance(value, str) and not value.strip():
-                missing.append(field)
-
         return missing
 
     def is_profile_complete(self):

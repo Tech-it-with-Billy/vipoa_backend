@@ -2,12 +2,13 @@ from rest_framework import serializers
 from .models import Profile
 from .constants import PROFILE_COMPLETION_FIELDS
 
-
-class ProfileReadSerializer(serializers.ModelSerializer):
+class ProfileSerializer(serializers.ModelSerializer):
     age = serializers.SerializerMethodField()
     bmi = serializers.SerializerMethodField()
     bmi_category = serializers.SerializerMethodField()
     tdee = serializers.SerializerMethodField()
+    poa_points = serializers.SerializerMethodField()
+    profile_completed_awarded = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Profile
@@ -25,13 +26,15 @@ class ProfileReadSerializer(serializers.ModelSerializer):
     def get_tdee(self, obj):
         return obj.tdee
 
+    def get_poa_points(self, obj):
+        return obj.poa_points
+
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         exclude = [
             "user",
-            "poa_points",
             "day_streak",
             "profile_completed_awarded",
             "updated_at",
@@ -39,7 +42,6 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProfileCompletionStatusSerializer(serializers.Serializer):
-
     is_complete = serializers.BooleanField()
     missing_fields = serializers.ListField(child=serializers.CharField())
     completion_percentage = serializers.FloatField()

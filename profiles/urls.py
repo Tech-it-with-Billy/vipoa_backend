@@ -4,7 +4,7 @@ from .views import ProfileCompletionStatusView, ProfileMeView, ProfileUpdateView
 app_name = "profiles"
 
 urlpatterns = [
-    # Get current user's profile
+    # Get and Patch current user's profile
     path("me/", ProfileMeView.as_view(), name="profile-me"),
 
     # Update current user's profile

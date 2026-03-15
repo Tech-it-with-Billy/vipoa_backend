@@ -18,5 +18,4 @@ def add_poa_points(profile: Profile, points: int, reason: str = ""):
     profile.poa_points += points
     profile.save(update_fields=["poa_points"])
 
-    # Later we can log reason in a transaction table
     return profile.poa_points
