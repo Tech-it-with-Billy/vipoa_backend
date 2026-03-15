@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Profile
 from .constants import PROFILE_COMPLETION_FIELDS
 
-class ProfileSerializer(serializers.ModelSerializer):
+class ProfileReadSerializer(serializers.ModelSerializer):
     age = serializers.SerializerMethodField()
     bmi = serializers.SerializerMethodField()
     bmi_category = serializers.SerializerMethodField()
