@@ -5,6 +5,7 @@ This is the only class that API views should call.
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -492,10 +493,16 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         # Multiple matches - show options
         options_list = []
         for i, match in enumerate(good_matches[:5], 1):
-            missing_str = f" (add: {', '.join(match.missing_ingredients[:2])})" if match.missing_ingredients else ""
-            options_list.append(f"{i}. {match.name} - {int(match.match_percentage * 100)}% match{missing_str}")
+            options_list.append(f"{i}. {match.name}")
         
-        message = "Hey there, you could try one of the following:\n\n" + "\n".join(options_list)
+        # Try friendly name from user input if available
+        user_name = None
+        user_name_match = re.search(r"\b(?:i\'m|i am|my name is|name is)\s+([A-Za-z]+)", user_input, re.IGNORECASE)
+        if user_name_match:
+            user_name = user_name_match.group(1).capitalize()
+
+        greeting = f"Hey {user_name}," if user_name else "Hey there,"
+        message = f"{greeting} you could try one of the following:\n\n" + "\n".join(options_list)
         message += "\n\nWhich one would you like?"
         
         self.awaiting_recipe_choice = True
@@ -556,8 +563,7 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         if near_matches:
             near_match_list = []
             for i, match in enumerate(near_matches[:3], 1):
-                missing_str = f" (add: {', '.join(match.missing_ingredients[:3])})" if match.missing_ingredients else ""
-                near_match_list.append(f"{i}. {match.name} - {int(match.match_percentage * 100)}% match{missing_str}")
+                near_match_list.append(f"{i}. {match.name}")
             
             message = "You're close! With a few more ingredients, you could make:\n\n" + "\n".join(near_match_list)
             message += "\n\nInterested in any of these?"
@@ -630,7 +636,6 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         
         # Header
         recipe_msg.append(f"Great! Here's the recipe for {recipe_name}:")
-        recipe_msg.append(f"\n{recipe_name}")
         if pd.notna(country) and country:
             recipe_msg.append(f"From: {country}")
         if pd.notna(cook_time) and cook_time:
@@ -638,27 +643,26 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         
         # Ingredients
         if pd.notna(ingredients) and ingredients:
-            recipe_msg.append("\nIngredients")
             safe_ingredients = ingredients.replace('→', '->').replace('•', '-').replace('✓', '*')
-            ingredient_list = [ing.strip() for ing in safe_ingredients.split(',')]
-            for ing in ingredient_list:
-                if ing:
-                    recipe_msg.append(f"  * {ing}")
+            ingredient_list = [ing.strip() for ing in safe_ingredients.split(',') if ing.strip()]
+            if ingredient_list:
+                recipe_msg.append("\nIngredients:")
+                for ing in ingredient_list:
+                    recipe_msg.append(f"- {ing}")
         
         # Steps
         if pd.notna(steps) and steps:
-            recipe_msg.append("\nSteps")
             safe_steps = steps.replace('→', '->').replace('•', '-').replace('✓', '*')
             safe_steps = safe_steps.replace('Method: Fry', '').replace('Method: Stew', '').replace('Method: Boil', '')
             safe_steps = safe_steps.replace('Steps: ', '').replace('Time: ', '')
             safe_steps = safe_steps.replace('30–40 min', '').replace('35–45 min', '').replace('45–60 min', '').replace('20–30 min', '')
             
-            step_list = [step.strip() for step in safe_steps.split('->')]
-            step_num = 1
-            for step in step_list:
-                if step and step.lower() not in ['', 'fry', 'stew', 'boil'] and 'min' not in step.lower():
-                    recipe_msg.append(f"  {step_num}. {step}")
-                    step_num += 1
+            step_candidates = re.split(r'[\n\.]+', safe_steps)
+            step_list = [step.strip() for step in step_candidates if step.strip()]
+            if step_list:
+                recipe_msg.append("\nSteps:")
+                for i, step in enumerate(step_list, 1):
+                    recipe_msg.append(f"{i}. {step}")
         
         # Tips from LLM
         recipe_msg.append("\nCooking Tips")
