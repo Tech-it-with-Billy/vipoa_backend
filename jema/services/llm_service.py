@@ -2,12 +2,11 @@ import os
 import re
 from pathlib import Path
 from typing import List, Dict
-
 try:
     from groq import Groq
 except ImportError:
     Groq = None
-from jema.src.language_detector import LanguageDetector
+from jema.utils.language_detector import LanguageDetector
 
 class LLMService:
     """Service to interact with LLM and manage conversation context for Jema."""
@@ -23,15 +22,23 @@ class LLMService:
                         key, value = line.split('=', 1)
                         os.environ[key.strip()] = value.strip()
 
-        api_key = os.environ.get("GROQ_API_KEY")
-        if Groq is None:
-            self.client = None
-        else:
-            if not api_key:
-                raise ValueError("GROQ_API_KEY not found in .env file")
-            self.client = Groq(api_key=api_key)
         self.conversation_history: List[Dict[str, str]] = []
         self.current_language: str = 'english'
+        self.client = None
+        if Groq is None:
+            print("Warning: Groq not installed; LLM features will use defaults.")
+            return
+
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
+            print("Warning: GROQ_API_KEY not found. LLM features disabled.")
+            return
+
+        try:
+            self.client = Groq(api_key=api_key)
+        except Exception as e:
+            print(f"Warning: Failed to initialize Groq: {e}")
+            self.client = None
 
         self.system_prompt_template = """You are Jema, a friendly East African cooking assistant. 
 Help users discover meals and prepare dishes from Kenya, Uganda, Tanzania, Ethiopia, Rwanda, Burundi, South Sudan, and Swahili cuisine.
@@ -67,10 +74,10 @@ Style: short, simple, friendly, to the point. Plain text only.
         else:
             messages = [{"role": "user", "content": user_input}]
         if self.client is None:
-            fallback = "I can help with recipes and cooking ideas. Tell me what ingredients you have."
+            default = "I'm here to help you cook! Tell me a meal name or the ingredients you have."
             if use_history:
-                self.add_to_history("assistant", fallback)
-            return fallback
+                self.add_to_history("assistant", default)
+            return default
         try:
             response = self.client.chat.completions.create(
                 messages=messages,

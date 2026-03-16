@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional
 import pandas as pd
-from .llm_service import LLMService
+from jema.services.llm_service import LLMService
 
 class RecipeFormatter:
     """Format and display recipes in a user-friendly way."""

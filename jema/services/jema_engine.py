@@ -13,7 +13,7 @@ import pandas as pd
 # Project paths
 JEMA_DIR = Path(__file__).parent.parent
 
-# Core imports from project-level src/
+# Core imports from src/ (until fully migrated to services/)
 from jema.src.data_loader import DataLoader
 from jema.src.ingredient_normalizer_v2 import IngredientNormalizer
 from jema.src.excel_recipe_matcher import ExcelRecipeMatcher
@@ -23,7 +23,7 @@ from jema.src.response_formatter import CTAFormatter, ResponseType
 from jema.src.language_detector import LanguageDetector
 
 # Services imports
-from .llm_service import LLMService
+from jema.services.llm_service import LLMService
 
 
 # Common East African recipes fallback (when not in database)
