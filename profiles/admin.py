@@ -20,4 +20,12 @@ class ProfileAdmin(admin.ModelAdmin):
         "profile_completed_awarded",
         "updated_at",
     )
-    readonly_fields = ("poa_points", "day_streak", "profile_completed_awarded", "age", "bmi", "bmi_category", "updated_at")
+    readonly_fields = (
+        "poa_points",
+        "day_streak",
+        "profile_completed_awarded",
+        "age",
+        "bmi",
+        "bmi_category",
+        "updated_at",
+    )
