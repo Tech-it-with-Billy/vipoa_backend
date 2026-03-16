@@ -1504,11 +1504,23 @@ def run_jema_model(
             "is_groq_generated": r.get("is_groq_generated", False)
         })
     
+    # Build conversational message text for UI friendliness
+    if results:
+        suggestion_lines = [f"{i+1}. {r['meal_name']}" for i, r in enumerate(results[:3])]
+        conversation_text = (
+            f"Hey there, you could try one of the following:\n" +
+            "\n".join(suggestion_lines) +
+            "\nWhich one would you like?"
+        )
+    else:
+        conversation_text = "I couldn't find a recipe with those ingredients. Can you add or change one ingredient?"
+
     result = {
         "language": language,
         "user_ingredients": sorted(user_ingredients_list),
         "pipeline_source": pipeline_source,
-        "results": results
+        "results": results,
+        "conversation_text": conversation_text
     }
     
     # Add debug info if requested
