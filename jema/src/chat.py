@@ -73,7 +73,7 @@ def main():
                 # Show top 3-5 recipes from this community
                 top_recipes = all_community_recipes.head(5)
                 
-                print(f"\nHere are some traditional {community.title()} dishes:\n")
+                print(f"\nHey there, you could try one of the following:\n")
                 recipe_list = []
                 for i, (idx, recipe) in enumerate(top_recipes.iterrows(), 1):
                     meal_type = recipe.get('meal_type ', 'dish')
@@ -82,7 +82,7 @@ def main():
                     print(f"{i}. {recipe['meal_name']}{time_str}")
                     recipe_list.append(recipe.to_dict())
                 
-                print(f"\nWhich one would you like to try?")
+                print(f"\nWhich one would you like?")
                 
                 # Set state for selection
                 last_suggested_recipes = recipe_list
@@ -239,6 +239,7 @@ def main():
                 steps = selected_recipe.get('recipes', '')
 
                 recipe_msg = []
+                recipe_msg.append(f"Great! Here's the recipe for {recipe_name}:")
                 recipe_msg.append(f"\n**{recipe_name}**")
                 if pd.notna(country) and country:
                     recipe_msg.append(f"*From: {country}*")
@@ -527,6 +528,7 @@ def main():
                 
                 # === BUILD COMPLETE RECIPE MESSAGE ===
                 recipe_msg = []
+                recipe_msg.append(f"Great! Here's the recipe for {recipe_name}:")
                 
                 # Relate user's ingredients to the recipe
                 if last_user_ingredients and pd.notna(ingredients) and ingredients:
@@ -605,14 +607,14 @@ def main():
             
             else:
                 # Multiple matches - show options (still no unnecessary questions)
-                print(f"\nHere are some dishes you can make:\n")
+                print(f"\nHey there, you could try one of the following:\n")
                 for i, match in enumerate(good_matches[:5], 1):
                     missing_str = f" (add: {', '.join(match.missing_ingredients[:2])})" if match.missing_ingredients else ""
                     print(f"{i}. {match.name} - {int(match.match_percentage * 100)}% match{missing_str}")
                 
                 # ONE simple question about which to try
                 cta = CTAFormatter.format_multiple_options_with_cta(
-                    "\nWhich one would you like to make?",
+                    "\nWhich one would you like?",
                     [m.name for m in good_matches[:5]],
                     llm.current_language
                 )

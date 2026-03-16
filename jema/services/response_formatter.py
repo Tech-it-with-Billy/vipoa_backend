@@ -11,7 +11,7 @@ class CTAFormatter:
 
     CTA_TEMPLATES = {
         ResponseType.RECIPE_SUGGESTION: ["Would you like the full recipe?"],
-        ResponseType.MULTIPLE_OPTIONS: ["Which one would you like to try?"],
+        ResponseType.MULTIPLE_OPTIONS: ["Which one would you like?"],
         ResponseType.QUESTION_ANSWER: ["Can I help you with a recipe for this?"]
     }
 

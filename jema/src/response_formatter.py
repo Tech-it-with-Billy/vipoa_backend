@@ -29,7 +29,7 @@ class CTAFormatter:
             "Would you like the full recipe and steps?"
         ],
         ResponseType.MULTIPLE_OPTIONS: [
-            "Which one would you like to try?",
+            "Which one would you like?",
             "Which of these interests you?",
             "Which would you prefer?"
         ],

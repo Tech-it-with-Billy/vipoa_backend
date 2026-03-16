@@ -214,7 +214,7 @@ class JemaEngine:
                 formatted_recipes.append(f"{i}. {recipe['meal_name']}{time_str}")
             
             message = f"Here are some traditional {community.title()} dishes:\n\n" + "\n".join(formatted_recipes)
-            message += f"\n\nWhich one would you like to try?"
+            message += f"\n\nWhich one would you like?"
             
             self.last_suggested_recipes = recipe_list
             self.awaiting_recipe_choice = True
@@ -495,8 +495,8 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
             missing_str = f" (add: {', '.join(match.missing_ingredients[:2])})" if match.missing_ingredients else ""
             options_list.append(f"{i}. {match.name} - {int(match.match_percentage * 100)}% match{missing_str}")
         
-        message = "Here are some dishes you can make:\n\n" + "\n".join(options_list)
-        message += "\n\nWhich one would you like to make?"
+        message = "Hey there, you could try one of the following:\n\n" + "\n".join(options_list)
+        message += "\n\nWhich one would you like?"
         
         self.awaiting_recipe_choice = True
         self.last_suggested_recipes = [
@@ -535,8 +535,8 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
                 }
                 recipe_objects.append(recipe_obj)
             
-            message = "You can make:\n\n" + "\n".join(recipe_list)
-            message += "\n\nWhich one interests you? I can give you the recipe!"
+            message = "Hey there, you could try one of the following:\n\n" + "\n".join(recipe_list)
+            message += "\n\nWhich one would you like?"
             
             self.last_suggested_recipes = recipe_objects
             self.awaiting_recipe_choice = True
@@ -629,6 +629,7 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
                 recipe_msg.append(f"(You may need: {', '.join(missing)})")
         
         # Header
+        recipe_msg.append(f"Great! Here's the recipe for {recipe_name}:")
         recipe_msg.append(f"\n{recipe_name}")
         if pd.notna(country) and country:
             recipe_msg.append(f"From: {country}")
