@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class ChatSession(models.Model):
     """Stores chat sessions for a user."""
     user_id = models.CharField(max_length=255, blank=True, null=True)
@@ -8,6 +9,7 @@ class ChatSession(models.Model):
 
     def __str__(self):
         return f"Session {self.id} - User {self.user_id}"
+
 
 class ChatMessage(models.Model):
     """Stores individual messages in a chat session."""

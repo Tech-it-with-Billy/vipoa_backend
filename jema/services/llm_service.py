@@ -2,8 +2,12 @@ import os
 import re
 from pathlib import Path
 from typing import List, Dict
-from groq import Groq
-from jema.utils.language_detector import LanguageDetector
+
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+from jema.src.language_detector import LanguageDetector
 
 class LLMService:
     """Service to interact with LLM and manage conversation context for Jema."""
@@ -20,10 +24,12 @@ class LLMService:
                         os.environ[key.strip()] = value.strip()
 
         api_key = os.environ.get("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("GROQ_API_KEY not found in .env file")
-
-        self.client = Groq(api_key=api_key)
+        if Groq is None:
+            self.client = None
+        else:
+            if not api_key:
+                raise ValueError("GROQ_API_KEY not found in .env file")
+            self.client = Groq(api_key=api_key)
         self.conversation_history: List[Dict[str, str]] = []
         self.current_language: str = 'english'
 
@@ -60,6 +66,11 @@ Style: short, simple, friendly, to the point. Plain text only.
             messages = self.get_conversation_context()
         else:
             messages = [{"role": "user", "content": user_input}]
+        if self.client is None:
+            fallback = "I can help with recipes and cooking ideas. Tell me what ingredients you have."
+            if use_history:
+                self.add_to_history("assistant", fallback)
+            return fallback
         try:
             response = self.client.chat.completions.create(
                 messages=messages,
@@ -87,6 +98,8 @@ Brief steps:
 {steps_text}
 
 Expand each step with clear instructions, timing, and tips."""
+        if self.client is None:
+            return steps
         try:
             response = self.client.chat.completions.create(
                 messages=[
