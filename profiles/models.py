@@ -1,13 +1,14 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from datetime import date
-
 from .constants import PROFILE_COMPLETION_FIELDS
 
 User = get_user_model()
 
+
 def profile_avatar_upload_path(instance, filename: str) -> str:
     return f"profiles/{instance.user_id}/avatar/{filename}"
+
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
@@ -55,7 +56,7 @@ class Profile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     # -----------------------------
-    # WALLET BALANCE (property)
+    # WALLET BALANCE
     # -----------------------------
     @property
     def poa_points(self):
