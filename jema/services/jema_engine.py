@@ -493,27 +493,26 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         # Multiple matches - show options
         options_list = []
         for i, match in enumerate(good_matches[:5], 1):
-            options_list.append(f"{i}. {match.name}")
-        
-        # Try friendly name from user input if available
-        user_name = None
-        user_name_match = re.search(r"\b(?:i\'m|i am|my name is|name is)\s+([A-Za-z]+)", user_input, re.IGNORECASE)
-        if user_name_match:
-            user_name = user_name_match.group(1).capitalize()
+            recipe_row = self.recipes_df[self.recipes_df['meal_name'] == match.name]
+            country = recipe_row.iloc[0].get('country', 'Unknown') if not recipe_row.empty else 'Unknown'
+            options_list.append(f"{i}. {match.name} – {country}")
 
-        greeting = f"Hey {user_name}," if user_name else "Hey there,"
-        message = f"{greeting} you could try one of the following:\n\n" + "\n".join(options_list)
+        message = "Hey there, you could try one of the following:\n\n" + "\n".join(options_list)
         message += "\n\nWhich one would you like?"
-        
+
         self.awaiting_recipe_choice = True
-        self.last_suggested_recipes = [
-            self.recipes_df[self.recipes_df['meal_name'] == m.name].iloc[0].to_dict()
-            for m in good_matches[:5]
-        ]
-        
+        self.last_suggested_recipes = []
+        for m in good_matches[:5]:
+            recipe_row = self.recipes_df[self.recipes_df['meal_name'] == m.name]
+            if not recipe_row.empty:
+                recipe_obj = recipe_row.iloc[0].to_dict()
+                recipe_obj['match_percentage'] = round(m.match_percentage, 2)
+                recipe_obj['missing_ingredients'] = m.missing_ingredients
+                self.last_suggested_recipes.append(recipe_obj)
+
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", message)
-        
+
         return self._build_response(message, self.last_suggested_recipes)
 
     def _handle_no_matches(self, user_ingredients: set, matcher, user_constraints: Dict, user_input: str) -> Dict:
@@ -609,83 +608,96 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         return self._build_response(response, [])
 
     def _display_full_recipe(self, recipe_row, user_input: str, user_ingredients: Optional[set] = None) -> Dict:
-        """Format and display a complete recipe."""
+        """Format and display a complete recipe in a structured Jema style."""
         recipe_data = recipe_row.to_dict() if not isinstance(recipe_row, dict) else recipe_row
-        
-        recipe_name = recipe_data.get('meal_name', 'Unknown')
-        country = recipe_data.get('country', '')
+
+        recipe_name = recipe_data.get('meal_name', 'Unknown').strip()
+        country = recipe_data.get('country', 'East Africa')
         cook_time = recipe_data.get('cook_time', '')
         ingredients = recipe_data.get('core_ingredients', '')
         steps = recipe_data.get('recipes', '')
-        
-        recipe_msg = []
-        
-        # Relate user's ingredients if provided
-        if user_ingredients and pd.notna(ingredients) and ingredients:
-            recipe_ing_list = [s.strip() for s in str(ingredients).split(',') if s.strip()]
-            recipe_ing_set = IngredientNormalizer.normalize_list(recipe_ing_list)
-            have = sorted(list(recipe_ing_set.intersection(user_ingredients)))
-            missing = [
-                ing for ing in recipe_ing_set 
-                if ing not in user_ingredients and not IngredientNormalizer.is_assumed_ingredient(ing)
-            ]
-            if have:
-                recipe_msg.append(f"Great! Based on what you have ({', '.join(have)}), here's an easy recipe:")
-            if missing:
-                recipe_msg.append(f"(You may need: {', '.join(missing)})")
-        
-        # Header
-        recipe_msg.append(f"Great! Here's the recipe for {recipe_name}:")
-        if pd.notna(country) and country:
-            recipe_msg.append(f"From: {country}")
-        if pd.notna(cook_time) and cook_time:
-            recipe_msg.append(f"Time: {cook_time} minutes")
-        
-        # Ingredients
+        description = recipe_data.get('description', '')
+
+        # Parse ingredients list
+        ingredient_list = []
         if pd.notna(ingredients) and ingredients:
             safe_ingredients = ingredients.replace('→', '->').replace('•', '-').replace('✓', '*')
-            ingredient_list = [ing.strip() for ing in safe_ingredients.split(',') if ing.strip()]
-            if ingredient_list:
-                recipe_msg.append("\nIngredients:")
-                for ing in ingredient_list:
-                    recipe_msg.append(f"- {ing}")
-        
-        # Steps
+            ingredient_list = [ing.strip() for ing in re.split(r'[\n,;]+', str(safe_ingredients)) if ing.strip()]
+
+        # Parse steps list
+        step_candidates = []
         if pd.notna(steps) and steps:
-            safe_steps = steps.replace('→', '->').replace('•', '-').replace('✓', '*')
-            safe_steps = safe_steps.replace('Method: Fry', '').replace('Method: Stew', '').replace('Method: Boil', '')
-            safe_steps = safe_steps.replace('Steps: ', '').replace('Time: ', '')
-            safe_steps = safe_steps.replace('30–40 min', '').replace('35–45 min', '').replace('45–60 min', '').replace('20–30 min', '')
-            
-            step_candidates = re.split(r'[\n\.]+', safe_steps)
-            step_list = [step.strip() for step in step_candidates if step.strip()]
-            if step_list:
-                recipe_msg.append("\nSteps:")
-                for i, step in enumerate(step_list, 1):
-                    recipe_msg.append(f"{i}. {step}")
-        
-        # Tips from LLM
-        recipe_msg.append("\nCooking Tips")
-        tips_prompt = f"Give me 2-3 practical cooking tips for making {recipe_name} from East Africa. Include tips like timing, texture, common mistakes to avoid. Keep it brief (2-3 sentences each). No markdown, plain text."
+            safe_steps = str(steps).replace('→', '->').replace('•', '-').replace('✓', '*')
+            safe_steps = safe_steps.replace('Steps:', '').replace('Method:', '')
+            step_candidates = [s.strip() for s in re.split(r'\n|\.|\d\.', safe_steps) if s.strip()]
+
+        # Determine essential ingredient categories by keyword mapping
+        categories = {
+            'Starch': ['rice', 'maize', 'ugali', 'pasta', 'bread', 'flour'],
+            'Protein': ['beef', 'chicken', 'goat', 'beans', 'lentils', 'eggs', 'fish', 'tofu'],
+            'Aromatics': ['onion', 'garlic', 'ginger', 'scallion', 'shallot', 'coriander'],
+            'Spices': ['cumin', 'coriander', 'turmeric', 'cardamom', 'paprika', 'pepper', 'clove', 'cinnamon'],
+            'Liquid': ['water', 'broth', 'stock', 'coconut milk', 'tomato sauce', 'oil'],
+            'Fat': ['oil', 'butter', 'ghee', 'margarine'],
+            'Optional': []
+        }
+        categorized = {k: [] for k in categories}
+        for ing in ingredient_list:
+            low = ing.lower()
+            matched = False
+            for cat, keys in categories.items():
+                if cat == 'Optional':
+                    continue
+                if any(key in low for key in keys):
+                    categorized[cat].append(ing)
+                    matched = True
+                    break
+            if not matched:
+                categorized['Optional'].append(ing)
+
+        # Build message
+        msg = []
+        msg.append(f"Great! Here's the recipe for {recipe_name}")
+        if description:
+            msg.append(f"\n{description.strip()}")
+        msg.append(f"\nCuisine: {country}")
+        if cook_time:
+            msg.append(f"Time: {cook_time} minutes")
+
+        if ingredient_list:
+            msg.append("\nEssential Ingredients")
+            for cat in ['Starch', 'Protein', 'Aromatics', 'Spices', 'Liquid', 'Fat', 'Optional']:
+                items = categorized.get(cat, [])
+                if items:
+                    msg.append(f"\n* {cat}: {', '.join(items)}")
+
+        if step_candidates:
+            msg.append("\nStep-by-Step Cooking Instructions")
+            for i, step in enumerate(step_candidates, 1):
+                msg.append(f"\n{i}. {step}")
+
+        # Add practical tips via LLM once
+        tips_prompt = f"Give 2 quick practical tips for making {recipe_name} in East African style. Keep it concise."        
         tips_response = self.llm.general_response(tips_prompt, use_history=False, include_cta=False)
-        tip_lines = tips_response.strip().split('\n')
-        for tip_line in tip_lines:
-            if tip_line.strip():
-                recipe_msg.append(f"  • {tip_line.strip()}")
-        
-        # Build final message
-        message = "\n".join(recipe_msg)
-        message += "\n\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
-        
-        # Lock in recipe
+        if tips_response:
+            msg.append("\nTips for Perfect {0}".format(recipe_name))
+            for tip_line in tips_response.strip().split('\n'):
+                if tip_line.strip():
+                    tip_text = tip_line.strip().lstrip('-*').strip()
+                    msg.append(f"\n* {tip_text}")
+
+        msg.append("\nLet me know if you need any clarification on any step, or if you'd like to try something else!")
+
+        message = "\n".join(msg)
+
         self.current_recipe = recipe_data
         self.recipe_confirmed = True
         self.last_suggested_recipes = [recipe_data]
         self.awaiting_recipe_choice = False
-        
+
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", message)
-        
+
         return self._build_response(message, [recipe_data])
     
     def _display_common_recipe_with_llm(self, recipe_data: Dict, user_input: str) -> Dict:
