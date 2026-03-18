@@ -1294,6 +1294,113 @@ def _recipe_has_forbidden_ingredient(recipe_name: str, recipe_text: str, religio
     return False
 
 
+def _match_recipe_selection(user_text: str, recipes_df: pd.DataFrame) -> Optional[pd.Series]:
+    """Return recipe row if user text is likely a recipe name selection."""
+    normalized = user_text.strip().lower()
+    if not normalized:
+        return None
+
+    # If the user query includes give me recipe style words, skip selection
+    if any(k in normalized for k in ['i have', 'have', 'ingredients', 'what can i cook', 'cook', 'recipe']):
+        return None
+
+    # Try exact match first on recipes dataframe
+    candidates = recipes_df[recipes_df['meal_name'].notna()]
+    for _, row in candidates.iterrows():
+        meal_name = str(row.get('meal_name', '')).lower().strip()
+        if not meal_name:
+            continue
+        if normalized == meal_name:
+            return row
+
+    # Try exact match in built-in library names
+    for recipe in EAST_AFRICAN_RECIPE_LIBRARY:
+        library_name = recipe.get('name', '').lower().strip()
+        if normalized == library_name:
+            return recipe
+
+    # Try fuzzy substring match for short input
+    if len(normalized.split()) <= 3:
+        for _, row in candidates.iterrows():
+            meal_name = str(row.get('meal_name', '')).lower().strip()
+            if meal_name and (normalized in meal_name or meal_name in normalized):
+                return row
+
+        for recipe in EAST_AFRICAN_RECIPE_LIBRARY:
+            library_name = recipe.get('name', '').lower().strip()
+            if library_name and (normalized in library_name or library_name in normalized):
+                return recipe
+
+    return None
+
+
+def _build_recipe_detail_response(
+    recipe_obj: Any,
+    language: str = 'en'
+) -> Dict[str, Any]:
+    # recipe_obj can be a pd.Series (csv row) or a dict from EAST_AFRICAN_RECIPE_LIBRARY
+    if isinstance(recipe_obj, pd.Series):
+        meal_name = str(recipe_obj.get('meal_name', 'Unknown')).strip()
+        country = str(recipe_obj.get('cuisine_region', recipe_obj.get('country', 'East Africa')) or 'East Africa').strip()
+        raw_steps = str(recipe_obj.get('recipes', '') or '')
+        core_ingredients = str(recipe_obj.get('core_ingredients', '') or '')
+        cook_time = int(recipe_obj.get('cook_time_minutes', 30) or 30)
+        recipe_id = int(recipe_obj.get('recipe_id', hash(meal_name) & 0x7fffffff))
+    else:
+        meal_name = str(recipe_obj.get('name', recipe_obj.get('meal_name', 'Unknown'))).strip()
+        country = str(recipe_obj.get('region', recipe_obj.get('cuisine_region', 'East Africa')) or 'East Africa').strip()
+        raw_steps = ''
+        core_ingredients = ', '.join(recipe_obj.get('ingredients', [])) if isinstance(recipe_obj.get('ingredients', []), list) else str(recipe_obj.get('ingredients', ''))
+        cook_time = int(recipe_obj.get('cook_time', 30) or 30)
+        recipe_id = int(recipe_obj.get('recipe_id', hash(meal_name) & 0x7fffffff))
+
+    if raw_steps:
+        step_list = [s.strip() for s in re.split(r'[\.\n]', raw_steps) if len(s.strip()) > 3]
+    else:
+        step_list = []
+    step_list = expand_recipe_steps(meal_name, step_list)
+
+    if not step_list:
+        # fallback default steps
+        step_list = [
+            'Use your ingredients and follow a basic cooking flow: sauté aromatics, add protein, add rice, simmer until cooked.'
+        ]
+
+    result = {
+        'recipe_id': recipe_id,
+        'meal_name': meal_name,
+        'cuisine_region': country,
+        'coverage': 1.0,
+        'matched': [],
+        'missing': [],
+        'missing_with_sub': [],
+        'missing_without_sub': [],
+        'cook_time_minutes': cook_time,
+        'recipe_steps': step_list,
+        'is_groq_generated': False
+    }
+
+    conversation_text = f"Great! Here's the recipe for {meal_name}\n\nCuisine: {country}\n\nEssential Ingredients\n"
+    if core_ingredients:
+        for ing in [i.strip() for i in core_ingredients.split(',') if i.strip()]:
+            conversation_text += f"* {ing}\n"
+    else:
+        conversation_text += "* Use your available ingredients\n"
+
+    conversation_text += "\nStep-by-Step Cooking Instructions\n"
+    for i, step in enumerate(step_list, 1):
+        conversation_text += f"{i}. {step}\n"
+    conversation_text += "\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
+
+    return {
+        'language': language,
+        'user_ingredients': [],
+        'pipeline_source': 'recipe_selection',
+        'results': [result],
+        'conversation_text': conversation_text
+    }
+
+
 # ============================================================================
 # MAIN PIPELINE: RUN JEMA MODEL
 # ============================================================================
@@ -1337,7 +1444,13 @@ def run_jema_model(
     # Detect language
     language = detect_language(user_text)
     log_debug(f"Language detected: {language}")
-    
+
+    # Check if this is a direct recipe selection (e.g., 'Pilau')
+    recipe_selection = _match_recipe_selection(user_text, recipes_df)
+    if recipe_selection is not None:
+        log_debug(f"Detected direct recipe selection: {recipe_selection.get('meal_name', 'Unknown')}")
+        return _build_recipe_detail_response(recipe_selection, language=language)
+
     # Extract user ingredients - returns normalized set
     user_ingredients = extract_user_ingredients(user_text)
     log_debug(f"Extracted user ingredients: {sorted(list(user_ingredients))}")
@@ -1357,36 +1470,61 @@ def run_jema_model(
     log_debug(f"Religious constraints: {religious_rules if religious_rules else 'None'}")
     
     # ========================================================================
-    # STEP 1: Try CSV Recipe Search
+    # STEP 1: Ingredient-Based Recommendation Algorithm
     # ========================================================================
     log_debug("=" * 60)
-    log_debug("STEP 1: CSV Recipe Search")
+    log_debug("STEP 1: Ingredient-Based Recommendation Algorithm")
     log_debug("=" * 60)
-    
-    ranked = rank_recipes(
-        user_ingredients, 
-        recipes_df, 
-        time_limit=time_limit, 
-        top_k=top_k,
-        religious_rules=religious_rules if religious_rules else None,
-        min_coverage=0.5  # Enforce 50% threshold
+
+    ingredient_algo = recommend_recipes_by_ingredients(
+        list(user_ingredients_normalized),
+        recipes_df,
+        top_n=top_k
     )
-    
-    log_debug(f"CSV returned {len(ranked)} recipes")
+
+    ranked = []
+    for rec in ingredient_algo:
+        recipe_id = rec.get('recipe_id', hash(rec.get('meal_name', '')) & 0x7fffffff)
+        core_ings = str(rec.get('core_ingredients', rec.get('ingredients_str', '')))
+        recipe_ingredients = set([i.strip().lower() for i in core_ings.split(',') if i.strip()])
+        matched = set([i.strip().lower() for i in rec.get('matched_ingredients', []) if i.strip()])
+        missing = recipe_ingredients - matched
+
+        ranked.append({
+            'recipe_id': recipe_id,
+            'meal_name': rec.get('meal_name', ''),
+            'cuisine_region': rec.get('cuisine_region', ''),
+            'coverage': len(matched) / len(recipe_ingredients) if recipe_ingredients else 1.0,
+            'matched': matched,
+            'missing': missing,
+            'missing_with_sub': set(),
+            'missing_without_sub': missing,
+            'cook_time_minutes': rec.get('cook_time_minutes', 30),
+            'score': rec.get('total_score', 0)
+        })
+
+    if not ranked:
+        # Fall back to CSV ranking when the ingredient algorithm has no matches
+        ranked = rank_recipes(
+            user_ingredients,
+            recipes_df,
+            time_limit=time_limit,
+            top_k=top_k,
+            religious_rules=religious_rules if religious_rules else None,
+            min_coverage=0.5
+        )
+
+    log_debug(f"Ingredient-based algorithm returned {len(ranked)} recipes")
     if ranked:
         for idx, recipe in enumerate(ranked, 1):
-            log_debug(f"  {idx}. {recipe['meal_name']} (coverage: {recipe['coverage']:.2%}, matched: {sorted(list(recipe['matched']))})")
+            log_debug(f"  {idx}. {recipe['meal_name']} (coverage: {recipe.get('coverage', 0):.2%}, matched: {sorted(list(recipe.get('matched', [])))})")
     else:
-        log_debug(f"  (no CSV recipes found)")
+        log_debug(f"  (no recipe matches found)")
+
+    pipeline_source = "ingredient_algorithm"
     
-    pipeline_source = "csv"
-    
-    # ========================================================================
-    # STEP 1: Check if CSV results are sufficient (>= 3 recipes)
-    # ========================================================================
     is_csv_weak = _is_weak_result(ranked, user_ingredients=user_ingredients, min_recipe_count=3)
-    log_debug(f"CSV results weak? {is_csv_weak} (need >= 3 recipes with good quality, got {len(ranked)})")
-    
+    log_debug(f"Ingredient-based results weak? {is_csv_weak} (need >= 3 recipes with good quality, got {len(ranked)})")
     if is_csv_weak:
         # CSV has fewer than 3 recipes → proceed to Step 2
         
