@@ -30,7 +30,7 @@ class LLMService:
             print("Warning: Groq not installed; LLM features will use defaults.")
             return
 
-        api_key = os.environ.get("GROQ_API_KEY")
+        api_key = os.environ.get("GROQ_API_KEY", "api_key")
         if not api_key:
             print("Warning: GROQ_API_KEY not found. LLM features disabled.")
             return
