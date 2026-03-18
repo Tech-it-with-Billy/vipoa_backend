@@ -1294,111 +1294,6 @@ def _recipe_has_forbidden_ingredient(recipe_name: str, recipe_text: str, religio
     return False
 
 
-def _format_recipe_suggestions(results: List[Dict[str, Any]], language: str = 'en') -> str:
-    """Format top recipe suggestions as conversational text."""
-    if language == 'sw':
-        header = "\nUnaweza kupika mojawapo ya vyakula hivi:\n\n"
-        footer = "\nUngependa ipi?"
-    else:
-        header = "\nHey there, you could try one of the following:\n\n"
-        footer = "\nWhich one would you like?"
-
-    lines = []
-    for idx, r in enumerate(results[:3], 1):
-        country = r.get('cuisine_region') or r.get('country') or ''
-        if country:
-            lines.append(f"{idx}. {r.get('meal_name', 'Unknown')} – {country}")
-        else:
-            lines.append(f"{idx}. {r.get('meal_name', 'Unknown')}")
-
-    if not lines:
-        return "I couldn't find recipe suggestions. Can you add or change one ingredient?"
-
-    return header + "\n".join(lines) + footer
-
-
-def _format_full_recipe(recipe_row: pd.Series) -> str:
-    """Build a full recipe text output in the requested format."""
-    recipe_name = str(recipe_row.get('meal_name', 'Unknown')).strip()
-    cuisine = str(recipe_row.get('cuisine_region', '') or recipe_row.get('country', '') or 'East Africa').strip().title()
-    core_ingredients = str(recipe_row.get('core_ingredients', '') or '').strip()
-    raw_steps = str(recipe_row.get('recipes', '') or '').strip()
-    notes = str(recipe_row.get('notes', '') or '').strip()
-
-    intro = f"\nGreat! Here's the recipe for {recipe_name}\n\n"
-    if notes:
-        intro += f"{notes}\n\n"
-    intro += f"Cuisine: {cuisine}\n\n"
-    intro += "Essential Ingredients\n\n"
-
-    if core_ingredients:
-        ingredients = [ing.strip() for ing in re.split(r'[,;\n]+', core_ingredients) if ing.strip()]
-        if not ingredients:
-            intro += "* (No ingredient list available)\n"
-        for ing in ingredients:
-            intro += f"* {ing}\n"
-    else:
-        intro += "* (No ingredients provided)\n"
-
-    intro += "\nStep-by-Step Cooking Instructions\n\n"
-    steps = []
-    if raw_steps:
-        # Split on newlines, arrows, and periods
-        pieces = re.split(r'[\n\r]+|→|\.|;|\d+\.', raw_steps)
-        for p in pieces:
-            p = p.strip()
-            if len(p) > 2:
-                steps.append(p)
-    if not steps:
-        steps = ["Follow the standard preparation: prepare ingredients, cook, and serve."]
-
-    for i, step in enumerate(steps[:8], 1):
-        sentence = step
-        if not sentence.endswith(('.', '!', '?')):
-            sentence += '.'
-        intro += f"{i}. {sentence}\n"
-
-    if notes:
-        intro += f"\nTips for Perfect {recipe_name}\n\n"
-        intro += f"* {notes}\n"
-
-    intro += "\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
-    return intro
-
-
-def _extract_requested_recipe_name(user_text: str, recipes_df: pd.DataFrame) -> Optional[pd.Series]:
-    """Return a matching recipe row if the user text looks like a recipe selection request."""
-    text = re.sub(r"[^a-z0-9\s]", " ", user_text.lower()).strip()
-    if not text:
-        return None
-
-    # Exact or phrase match for known recipe names
-    for _, row in recipes_df.iterrows():
-        name = str(row.get('meal_name', '')).lower().strip()
-        if not name:
-            continue
-        name_norm = re.sub(r"[^a-z0-9\s]", " ", name)
-        if name_norm and (name_norm == text or f" {name_norm} " in f" {text} " or text.endswith(name_norm) or text.startswith(name_norm)):
-            return row
-
-    # Fallback: fuzzy match for short inputs
-    if len(text.split()) <= 4:
-        best_name = None
-        best_score = 0.0
-        for _, row in recipes_df.iterrows():
-            name = str(row.get('meal_name', '')).lower().strip()
-            if not name:
-                continue
-            score = SequenceMatcher(None, text, name).ratio()
-            if score > best_score:
-                best_score = score
-                best_name = row
-        if best_score >= 0.75 and best_name is not None:
-            return best_name
-
-    return None
-
-
 # ============================================================================
 # MAIN PIPELINE: RUN JEMA MODEL
 # ============================================================================
@@ -1453,30 +1348,6 @@ def run_jema_model(
     )
     log_debug(f"Normalized user ingredients: {sorted(list(user_ingredients_normalized))}")
     
-    # If user input looks like they named a recipe, return that recipe directly
-    requested_recipe = _extract_requested_recipe_name(user_text, recipes_df)
-    if requested_recipe is not None:
-        recipe_text = _format_full_recipe(requested_recipe)
-        recipe_data = {
-            "recipe_id": int(requested_recipe.get("recipe_id", -1)) if "recipe_id" in requested_recipe else -1,
-            "meal_name": requested_recipe.get("meal_name", ""),
-            "cuisine_region": requested_recipe.get("cuisine_region", requested_recipe.get("country", "")),
-            "core_ingredients": requested_recipe.get("core_ingredients", ""),
-            "recipes": requested_recipe.get("recipes", ""),
-            "cook_time_minutes": requested_recipe.get("cook_time_minutes", 0),
-            "notes": requested_recipe.get("notes", ""),
-        }
-        result = {
-            "language": language,
-            "user_ingredients": sorted(user_ingredients),
-            "pipeline_source": "direct_recipe",
-            "results": [recipe_data],
-            "conversation_text": recipe_text
-        }
-        if debug and debug_log:
-            result["debug"] = debug_log
-        return result
-
     # Extract time limit
     time_limit = extract_time_limit(user_text)
     log_debug(f"Time limit: {time_limit} minutes")
@@ -1635,7 +1506,12 @@ def run_jema_model(
     
     # Build conversational message text for UI friendliness
     if results:
-        conversation_text = _format_recipe_suggestions(results, language=language)
+        suggestion_lines = [f"{i+1}. {r['meal_name']}" for i, r in enumerate(results[:3])]
+        conversation_text = (
+            f"Hey there, you could try one of the following:\n" +
+            "\n".join(suggestion_lines) +
+            "\nWhich one would you like?"
+        )
     else:
         conversation_text = "I couldn't find a recipe with those ingredients. Can you add or change one ingredient?"
 
