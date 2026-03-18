@@ -244,6 +244,12 @@ class JemaEngine:
             return self._handle_follow_up(user_input)
         
         if self.awaiting_recipe_choice and self.last_suggested_recipes:
+            # If user provides new ingredients while awaiting a choice, treat as fresh ingredient query.
+            if intent == Intent.INGREDIENT_BASED:
+                self.awaiting_recipe_choice = False
+                self.last_suggested_recipes = []
+                return self._handle_ingredient_based(user_input, constraints)
+
             result = self._handle_recipe_selection(user_input)
             if result:
                 return result
@@ -603,7 +609,10 @@ class JemaEngine:
         user_ingredients = IngredientNormalizer.extract_from_string(user_input)
         
         if not user_ingredients:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+            # If we were awaiting a recipe choice, clear that state when user sends a new non-selection input.
+            self.awaiting_recipe_choice = False
+            self.last_suggested_recipes = []
+            response = "I couldn't extract ingredients from that. Please tell me your ingredients (e.g., 'I have rice, onions, and beef')."
             self.llm.add_to_history("user", user_input)
             self.llm.add_to_history("assistant", response)
             return self._build_response(response, [])
