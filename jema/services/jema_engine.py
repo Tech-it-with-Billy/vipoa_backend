@@ -101,6 +101,36 @@ class JemaEngine:
         self.llm = LLMService()
         self.language_detector = LanguageDetector()
         
+        # Load all_ingred.csv for ingredient validation
+        try:
+            all_ingred_path = JEMA_DIR / "data" / "all_ingred.csv"
+            if not all_ingred_path.exists():
+                all_ingred_path = Path(__file__).parent.parent / "data" / "all_ingred.csv"
+            if all_ingred_path.exists():
+                all_ingred_df = pd.read_csv(all_ingred_path)
+                # Build a set of known ingredients for fast lookup
+                # Normalize to lowercase for matching
+                self.known_ingredients = set(
+                    all_ingred_df['ingredient'].str.lower().str.strip()
+                    if 'ingredient' in all_ingred_df.columns
+                    else []
+                )
+                # Also extract base words from compound names
+                # e.g. "White rice (cooked)" → "rice"
+                for ing in list(self.known_ingredients):
+                    # Extract first meaningful word
+                    base = re.sub(r'\(.*?\)', '', ing).strip()
+                    base = re.split(r'\s+', base)[0].strip()
+                    if len(base) > 2:
+                        self.known_ingredients.add(base)
+                print(f"Loaded {len(self.known_ingredients)} known ingredients from all_ingred.csv")
+            else:
+                self.known_ingredients = set()
+                print("Warning: all_ingred.csv not found")
+        except Exception as e:
+            self.known_ingredients = set()
+            print(f"Warning: Could not load all_ingred.csv: {e}")
+        
         # Conversation state
         self.last_suggested_recipes: List[Dict] = []
         self.rejected_recipes: List[str] = []
@@ -375,71 +405,37 @@ class JemaEngine:
         return self._build_response(response, [])
 
     def _handle_recipe_request(self, user_input: str) -> Dict:
-        """Handle specific recipe requests (I want to make X)."""
-        # Extract recipe query
-        recipe_query = user_input.lower()
-        for phrase in ['i would like to make', 'i want to make', 'recipe for', 'how do i make', 'show me', 'ninataka', 'i would like', 'i want']:
-            recipe_query = recipe_query.replace(phrase, '').strip()
-        
-        # Try to split query by "and" to handle pairing requests (e.g., "ugali and greens")
-        query_parts = [q.strip() for q in recipe_query.split(' and ')]
-        found_recipes = []
-        
-        # Search database for each part
-        for part in query_parts:
-            part_matches = []
-            for idx, recipe in self.recipes_df.iterrows():
-                meal_name = recipe.get('meal_name', '')
-                if pd.isna(meal_name):
-                    continue
-                meal_name_lower = str(meal_name).lower()
-                # Exact or partial match
-                if part in meal_name_lower or meal_name_lower in part:
-                    part_matches.append(recipe)
-            
-            if part_matches:
-                # Take best match for this part
-                found_recipes.append(part_matches[0])
-            elif len(query_parts) == 1:
-                # Single dish not found - will generate via LLM below
-                found_recipes = []
-                break
-        
-        # If we found at least one recipe from the database
-        if found_recipes:
-            if len(found_recipes) == 1:
-                # Single recipe found
-                return self._display_full_recipe(found_recipes[0], user_input)
-            else:
-                # Multiple recipes found - display as a meal pairing
-                return self._display_meal_pairing(found_recipes, user_input)
-        else:
-            # No database matches - Generate recipe for specific dish request using LLM
-            # This handles requests like "rice and beef stew" or "ugali and greens"
-            prompt = f"""Generate a complete traditional East African recipe for '{recipe_query}'. 
+        """
+        Handle direct recipe requests like 'How do I cook pilau?' or 'Give me a chapati recipe'.
+        Always uses generate_recipe — never uses general_response for recipe requests.
+        """
+        # Extract recipe name from the request
+        recipe_name = self._extract_recipe_name(user_input)
 
-Provide:
-1. Brief description (1-2 sentences)
-2. Full ingredient list with quantities
-3. Step-by-step cooking instructions (numbered)
-4. 2-3 practical cooking tips
-
-Format as plain text, no markdown. Be specific with measurements and timing."""
-
-            llm_response = self.llm.general_response(prompt, use_history=False, include_cta=False)
-            
-            message = f"🍽️ {recipe_query.title()}\n\n{llm_response}"
-            message += "\n\nLet me know if you need any clarification, or if you'd like to try something else!"
-            
-            # Lock in recipe
-            self.current_recipe = {"meal_name": recipe_query.title()}
-            self.recipe_confirmed = True
-            self.awaiting_recipe_choice = False
-            
+        if not recipe_name:
+            response = self.llm.general_response(user_input, use_history=True, include_cta=True)
             self.llm.add_to_history("user", user_input)
-            self.llm.add_to_history("assistant", message)
-            
-            return self._build_response(message, [self.current_recipe])
+            self.llm.add_to_history("assistant", response)
+            return self._build_response(response, [])
+
+        # Clean the recipe name
+        recipe_name = re.sub(r'[?!.,;:\'"()\[\]]', '', recipe_name).strip()
+
+        if not recipe_name:
+            response = self.llm.general_response(user_input, use_history=True, include_cta=True)
+            return self._build_response(response, [])
+
+        # Use _display_full_recipe which handles Groq enrichment
+        recipe_data = {
+            "meal_name":      recipe_name.title(),
+            "cuisine_region": "East Africa",
+            "ingredients":    [],
+            "steps":          [],
+            "introduction":   "",
+            "tips":           [],
+        }
+
+        return self._display_full_recipe(recipe_data, user_input)
 
     def _handle_ingredient_based(self, user_input: str, constraints: List) -> Dict:
         """Handle ingredient-based recipe matching."""
@@ -451,6 +447,18 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
             self.llm.add_to_history("user", user_input)
             self.llm.add_to_history("assistant", response)
             return self._build_response(response, [])
+        
+        # Validate ingredients against all_ingred.csv
+        # Keep all ingredients — known ones are validated, unknown ones are passed to Groq
+        # This ensures we never silently drop ingredients
+        if self.known_ingredients:
+            normalized_ingredients = [ing.lower().strip() for ing in user_ingredients]
+            known = [i for i in normalized_ingredients if i in self.known_ingredients]
+            unknown = [i for i in normalized_ingredients if i not in self.known_ingredients]
+            if unknown:
+                print(f"[INGREDIENT VALIDATION] Known: {known} | Unknown (passing to Groq): {unknown}")
+            # Use all ingredients for matching — do not drop unknown ones
+            # Unknown ingredients will be handled by Groq suggestion
         
         # Remember ingredients
         self.last_user_ingredients = set(user_ingredients)
@@ -491,10 +499,25 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
             return self._display_full_recipe(recipe_data, user_input, user_ingredients)
         
         # Multiple matches - show options
+        # Deduplicate matches by normalized name before displaying
+        seen_names = set()
+        deduped_matches = []
+        for match in good_matches:
+            normalized = self._normalize_recipe_name(match.name)
+            if normalized not in seen_names:
+                seen_names.add(normalized)
+                deduped_matches.append(match)
+        
+        # Cap at 3 — never show more than 3 suggestions
+        deduped_matches = deduped_matches[:3]
+        
         options_list = []
-        for i, match in enumerate(good_matches[:5], 1):
+        for i, match in enumerate(deduped_matches, 1):
             recipe_row = self.recipes_df[self.recipes_df['meal_name'] == match.name]
-            country = recipe_row.iloc[0].get('country', 'Unknown') if not recipe_row.empty else 'Unknown'
+            if not recipe_row.empty:
+                country = recipe_row.iloc[0].get('country', '') or recipe_row.iloc[0].get('cuisine_region', 'East Africa')
+            else:
+                country = 'East Africa'
             options_list.append(f"{i}. {match.name} – {country}")
 
         message = "Hey there, you could try one of the following:\n\n" + "\n".join(options_list)
@@ -502,7 +525,7 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
 
         self.awaiting_recipe_choice = True
         self.last_suggested_recipes = []
-        for m in good_matches[:5]:
+        for m in deduped_matches:
             recipe_row = self.recipes_df[self.recipes_df['meal_name'] == m.name]
             if not recipe_row.empty:
                 recipe_obj = recipe_row.iloc[0].to_dict()
@@ -607,98 +630,135 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         
         return self._build_response(response, [])
 
-    def _display_full_recipe(self, recipe_row, user_input: str, user_ingredients: Optional[set] = None) -> Dict:
-        """Format and display a complete recipe in a structured Jema style."""
-        recipe_data = recipe_row.to_dict() if not isinstance(recipe_row, dict) else recipe_row
+    def _display_full_recipe(self, recipe_data, user_input: str, user_ingredients: set = None) -> Dict:
+        """
+        Display a full recipe using Groq enrichment.
+        Always calls generate_recipe to get rich output — never displays raw CSV data.
+        Raw CSV data like 'Fry onions -> Simmer' is unacceptable output.
+        """
+        # Get recipe name and cuisine from whatever source we have
+        if isinstance(recipe_data, dict):
+            recipe_name   = recipe_data.get('meal_name') or recipe_data.get('name', '')
+            cuisine_region = (recipe_data.get('cuisine_region') or
+                             recipe_data.get('country') or
+                             'East Africa')
+            # Check if this recipe already has rich Groq data (from suggestion pipeline)
+            existing_ingredients = recipe_data.get('ingredients', [])
+            existing_steps       = recipe_data.get('steps', [])
+            existing_intro       = recipe_data.get('introduction', '')
+            existing_tips        = recipe_data.get('tips', [])
+        else:
+            # Pandas Series from CSV
+            recipe_name    = recipe_data.get('meal_name', '')
+            cuisine_region = (recipe_data.get('cuisine_region') or
+                             recipe_data.get('country') or
+                             'East Africa')
+            existing_ingredients = []
+            existing_steps       = []
+            existing_intro       = ''
+            existing_tips        = []
 
-        recipe_name = recipe_data.get('meal_name', 'Unknown').strip()
-        country = recipe_data.get('country', 'East Africa')
-        cook_time = recipe_data.get('cook_time', '')
-        ingredients = recipe_data.get('core_ingredients', '')
-        steps = recipe_data.get('recipes', '')
-        description = recipe_data.get('description', '')
+        if not recipe_name:
+            return self._build_response("Could not find that recipe. Please try again.", [])
 
-        # Parse ingredients list
-        ingredient_list = []
-        if pd.notna(ingredients) and ingredients:
-            safe_ingredients = ingredients.replace('→', '->').replace('•', '-').replace('✓', '*')
-            ingredient_list = [ing.strip() for ing in re.split(r'[\n,;]+', str(safe_ingredients)) if ing.strip()]
+        # Check if we already have rich Groq data with 4+ steps
+        # This happens when recipe came from generate_east_african_recipe_from_ingredients
+        has_rich_data = (
+            len(existing_steps) >= 4 and
+            len(existing_ingredients) >= 3 and
+            existing_intro
+        )
 
-        # Parse steps list
-        step_candidates = []
-        if pd.notna(steps) and steps:
-            safe_steps = str(steps).replace('→', '->').replace('•', '-').replace('✓', '*')
-            safe_steps = safe_steps.replace('Steps:', '').replace('Method:', '')
-            step_candidates = [s.strip() for s in re.split(r'\n|\.|\d\.', safe_steps) if s.strip()]
+        if has_rich_data:
+            # Use existing rich data — no second Groq call needed
+            recipe_dict = {
+                "meal_name":      recipe_name,
+                "cuisine_region": cuisine_region,
+                "introduction":   existing_intro,
+                "ingredients":    existing_ingredients,
+                "steps":          existing_steps,
+                "tips":           existing_tips,
+            }
+        else:
+            # Recipe came from CSV with sparse data — enrich with Groq
+            try:
+                recipe_dict = self.llm.generate_recipe(
+                    recipe_name=recipe_name,
+                    cuisine_region=cuisine_region
+                )
+                if not recipe_dict:
+                    raise ValueError("Empty response from generate_recipe")
+            except Exception as e:
+                print(f"LLM Error during recipe enrichment: {e}")
+                # Build minimal response from CSV data as last resort
+                recipe_dict = {
+                    "cuisine":      cuisine_region,
+                    "introduction": "",
+                    "ingredients":  [],
+                    "steps":        [],
+                    "tips":         []
+                }
 
-        # Determine essential ingredient categories by keyword mapping
-        categories = {
-            'Starch': ['rice', 'maize', 'ugali', 'pasta', 'bread', 'flour'],
-            'Protein': ['beef', 'chicken', 'goat', 'beans', 'lentils', 'eggs', 'fish', 'tofu'],
-            'Aromatics': ['onion', 'garlic', 'ginger', 'scallion', 'shallot', 'coriander'],
-            'Spices': ['cumin', 'coriander', 'turmeric', 'cardamom', 'paprika', 'pepper', 'clove', 'cinnamon'],
-            'Liquid': ['water', 'broth', 'stock', 'coconut milk', 'tomato sauce', 'oil'],
-            'Fat': ['oil', 'butter', 'ghee', 'margarine'],
-            'Optional': []
+        # Extract all fields
+        cuisine      = recipe_dict.get('cuisine') or recipe_dict.get('cuisine_region') or cuisine_region
+        introduction = recipe_dict.get('introduction', '')
+        ingredients  = recipe_dict.get('ingredients', [])
+        steps        = recipe_dict.get('steps', [])
+        tips         = recipe_dict.get('tips', [])
+
+        # Build the rich output
+        output = f"\nGreat! Here's the recipe for {recipe_name}\n"
+
+        if introduction:
+            output += f"\n{introduction}\n"
+
+        output += f"\nCuisine: {cuisine}\n"
+
+        # Ingredients section
+        output += "\nEssential Ingredients\n\n"
+        for ing in ingredients:
+            ing = str(ing).strip()
+            if not ing.startswith("*"):
+                ing = "* " + ing
+            output += ing + "\n"
+
+        # Steps section
+        output += "\nStep-by-Step Cooking Instructions\n\n"
+        for i, step in enumerate(steps[:6], 1):
+            step = str(step).strip()
+            step = re.sub(r'^\d+[\.\)]\s*', '', step).strip()
+            step = re.sub(r'\*\*', '', step).strip()
+            if not step.endswith((".", "!", "?")):
+                step += "."
+            output += f"{i}. {step}\n"
+
+        # Tips section
+        if tips:
+            output += f"\nTips for Perfect {recipe_name}\n\n"
+            for tip in tips:
+                tip = str(tip).strip()
+                if not tip.startswith("*"):
+                    tip = "* " + tip
+                output += tip + "\n"
+
+        output += "\nLet me know if you need any clarification on any step, or if you'd like to try something else!\n"
+
+        # Store as current recipe
+        self.current_recipe = {
+            "meal_name":      recipe_name,
+            "cuisine_region": cuisine,
+            "introduction":   introduction,
+            "ingredients":    ingredients,
+            "steps":          steps,
+            "tips":           tips,
         }
-        categorized = {k: [] for k in categories}
-        for ing in ingredient_list:
-            low = ing.lower()
-            matched = False
-            for cat, keys in categories.items():
-                if cat == 'Optional':
-                    continue
-                if any(key in low for key in keys):
-                    categorized[cat].append(ing)
-                    matched = True
-                    break
-            if not matched:
-                categorized['Optional'].append(ing)
-
-        # Build message
-        msg = []
-        msg.append(f"Great! Here's the recipe for {recipe_name}")
-        if description:
-            msg.append(f"\n{description.strip()}")
-        msg.append(f"\nCuisine: {country}")
-        if cook_time:
-            msg.append(f"Time: {cook_time} minutes")
-
-        if ingredient_list:
-            msg.append("\nEssential Ingredients")
-            for cat in ['Starch', 'Protein', 'Aromatics', 'Spices', 'Liquid', 'Fat', 'Optional']:
-                items = categorized.get(cat, [])
-                if items:
-                    msg.append(f"\n* {cat}: {', '.join(items)}")
-
-        if step_candidates:
-            msg.append("\nStep-by-Step Cooking Instructions")
-            for i, step in enumerate(step_candidates, 1):
-                msg.append(f"\n{i}. {step}")
-
-        # Add practical tips via LLM once
-        tips_prompt = f"Give 2 quick practical tips for making {recipe_name} in East African style. Keep it concise."        
-        tips_response = self.llm.general_response(tips_prompt, use_history=False, include_cta=False)
-        if tips_response:
-            msg.append("\nTips for Perfect {0}".format(recipe_name))
-            for tip_line in tips_response.strip().split('\n'):
-                if tip_line.strip():
-                    tip_text = tip_line.strip().lstrip('-*').strip()
-                    msg.append(f"\n* {tip_text}")
-
-        msg.append("\nLet me know if you need any clarification on any step, or if you'd like to try something else!")
-
-        message = "\n".join(msg)
-
-        self.current_recipe = recipe_data
-        self.recipe_confirmed = True
-        self.last_suggested_recipes = [recipe_data]
+        self.recipe_confirmed      = True
         self.awaiting_recipe_choice = False
 
         self.llm.add_to_history("user", user_input)
-        self.llm.add_to_history("assistant", message)
+        self.llm.add_to_history("assistant", output)
 
-        return self._build_response(message, [recipe_data])
+        return self._build_response(output, [self.current_recipe])
     
     def _display_common_recipe_with_llm(self, recipe_data: Dict, user_input: str) -> Dict:
         """Generate and display a recipe for a common dish using LLM."""
@@ -862,3 +922,64 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
             "rejected_recipes": self.rejected_recipes,
             "conversation_history_length": len(self.llm.conversation_history),
         }
+
+    def _normalize_recipe_name(self, recipe_name: str) -> str:
+        """Normalize recipe name for deduplication."""
+        # Convert to lowercase and remove special characters
+        normalized = recipe_name.lower().strip()
+        # Remove articles and common prefixes
+        normalized = re.sub(r'^(the|a|an|traditional|east african)\s+', '', normalized)
+        # Normalize spacing
+        normalized = re.sub(r'\s+', ' ', normalized)
+        return normalized
+
+    def _extract_recipe_name(self, user_input: str) -> Optional[str]:
+        """Extract recipe name from user input."""
+        user_input_lower = user_input.lower()
+        
+        # Common recipe request phrases
+        phrases_to_remove = [
+            'i would like to make',
+            'i want to make',
+            'recipe for',
+            'how do i make',
+            'how to make',
+            'show me',
+            'i would like',
+            'i want',
+            'what is',
+            'tell me about',
+            'ninataka',
+            'make me',
+            'give me',
+            'gimme',
+            'can i make',
+            'how to cook',
+            'cook',
+        ]
+        
+        recipe_name = user_input_lower
+        for phrase in phrases_to_remove:
+            if phrase in recipe_name:
+                recipe_name = recipe_name.replace(phrase, '')
+                break
+        
+        recipe_name = recipe_name.strip()
+        
+        # If nothing left, try splitting on key words
+        if not recipe_name or len(recipe_name) < 2:
+            # Try to extract just the dish name
+            words = user_input.split()
+            if len(words) > 2:
+                # Skip articles
+                start_idx = 0
+                for i, word in enumerate(words):
+                    if word.lower() not in ['a', 'an', 'the', 'i', 'to', 'make', 'cook', 'how', 'do']:
+                        start_idx = i
+                        break
+                recipe_name = ' '.join(words[start_idx:]).strip()
+        
+        # Clean punctuation
+        recipe_name = re.sub(r'[?!.,;:\'"()\[\]]', '', recipe_name).strip()
+        
+        return recipe_name if recipe_name else None
