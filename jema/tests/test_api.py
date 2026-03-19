@@ -89,20 +89,25 @@ class JemaChatTests(APITestCase):
         # Should detect language
         self.assertIn(response.data['language'], ['english', 'swahili', 'french', 'amharic'])
     
-    def test_response_has_state(self):
-        """Test that response includes conversation state"""
-        response = self.client.post(
-            self.chat_url,
-            {'message': 'Show me how to make Njahi'},
-            format='json'
-        )
-        
+    def test_query_endpoint_protein_star(self):
+        """Test /api/jema/query/ returns structured protein-based suggestions."""
+        query_url = '/api/jema/query/'
+        response = self.client.post(query_url, {'text': 'I have onions, tomatoes, garlic, chicken and kale.'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('state', response.data)
-        # State should have conversation tracking fields
-        state = response.data['state']
-        self.assertIn('recipe_confirmed', state)
-        self.assertIn('awaiting_recipe_choice', state)
+        self.assertIn('pipeline', response.data)
+        self.assertIn('data', response.data)
+        data = response.data['data']
+        self.assertIn('structured_recommendations', data)
+        self.assertTrue(any('chicken' in rec['dish_name'].lower() or 'sukuma' in rec['dish_name'].lower() for rec in data['structured_recommendations']))
+
+    def test_query_endpoint_no_hallucination(self):
+        """Ensure query output does not suggest unrelated main dish for chicken input."""
+        query_url = '/api/jema/query/'
+        response = self.client.post(query_url, {'text': 'I have onions, tomatoes, garlic, chicken and kale.'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data['data']
+        dish_names = [r['dish_name'].lower() for r in data.get('structured_recommendations', [])]
+        self.assertFalse(any('octopus' in d or 'matoke' in d for d in dish_names))
 
 
 class JemaSessionTests(APITestCase):
