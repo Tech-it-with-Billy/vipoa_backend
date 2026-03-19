@@ -431,97 +431,99 @@ class JemaEngine:
         
         return self._build_response(response, [])
 
-    def _handle_recipe_request(self, user_input: str) -> Dict:
-        """Handle direct recipe requests like 'How do I cook pilau?'"""
+    def _extract_recipe_name(self, user_input: str) -> str:
+        """
+        Extract recipe name from a direct recipe request.
 
+        Handles patterns like:
+        - "How do I cook pilau?"
+        - "Give me a recipe for chapati"
+        - "How to make ugali"
+        - "Recipe for biryani"
+        - "How can I cook matoke?"
+        """
+        query = user_input.lower().strip()
+
+        # Remove common request prefixes — longest first to avoid partial matches
+        prefixes = [
+            "give me a recipe for ",
+            "give me the recipe for ",
+            "how do i cook ",
+            "how can i cook ",
+            "how do i make ",
+            "how can i make ",
+            "how to cook ",
+            "how to make ",
+            "recipe for ",
+            "recipe of ",
+            "show me how to cook ",
+            "show me how to make ",
+            "i want to cook ",
+            "i want to make ",
+            "steps for ",
+            "instructions for ",
+            "cook ",
+            "make ",
+        ]
+
+        for prefix in prefixes:
+            if prefix in query:
+                name = query.split(prefix, 1)[-1].strip()
+                # Remove trailing punctuation and filler words
+                name = re.sub(r'[?!.,;:\'"]+$', '', name).strip()
+                name = re.sub(r'\s+', ' ', name).strip()
+                if name and len(name) > 1:
+                    return name.title()
+
+        # Fallback — check if any known recipe name appears in the query
+        for _, row in self.recipes_df.iterrows():
+            meal_name = str(row.get('meal_name', '')).lower()
+            if meal_name and meal_name in query:
+                return str(row.get('meal_name', '')).title()
+
+        return ""
+
+    def _handle_recipe_request(self, user_input: str) -> Dict:
+        """
+        Handle direct recipe requests like:
+        - "How do I cook pilau?"
+        - "Give me a recipe for chapati"
+        - "How to make ugali"
+
+        Always uses generate_recipe — never uses general_response for recipe requests.
+        Produces the same rich format as recipe selection.
+        """
         # Extract recipe name from the request
         recipe_name = self._extract_recipe_name(user_input)
 
         if not recipe_name:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=True)
+            response = self.llm.general_response(
+                user_input, use_history=True, include_cta=True
+            )
             self.llm.add_to_history("user", user_input)
             self.llm.add_to_history("assistant", response)
             return self._build_response(response, [])
 
-        # Call generate_recipe to get the full rich recipe
-        try:
-            recipe_data = self.llm.generate_recipe(
-                recipe_name=recipe_name,
-                cuisine_region="East Africa"
+        # Clean the recipe name
+        recipe_name = re.sub(r'[?!.,;:\'"()\[\]]', '', recipe_name).strip()
+
+        if not recipe_name:
+            response = self.llm.general_response(
+                user_input, use_history=True, include_cta=True
             )
-        except Exception as e:
-            print(f"Recipe generation error: {e}")
-            response = self.llm.general_response(user_input, use_history=True, include_cta=True)
             return self._build_response(response, [])
 
-        if not recipe_data:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=True)
-            return self._build_response(response, [])
-
-        cuisine      = (
-            recipe_data.get("cuisine", "")
-            or recipe_data.get("cuisine_region", "")
-            or "East Africa"
-        )
-        introduction = recipe_data.get("introduction", "")
-        ingredients  = recipe_data.get("ingredients", [])
-        steps        = recipe_data.get("steps", [])
-        tips         = recipe_data.get("tips", [])
-
-        # Build rich output — same format as recipe selection
-        output = f"\nGreat! Here's the recipe for {recipe_name.title()}\n"
-
-        if introduction:
-            output += f"\n{introduction}\n"
-
-        output += f"\nCuisine: {cuisine}\n"
-
-        output += "\nEssential Ingredients\n\n"
-        for ing in ingredients:
-            ing = ing.strip()
-            if not ing.startswith("*"):
-                ing = "* " + ing
-            # Skip empty category lines like "* Vegetables:" or "* Optional:"
-            # These are lines where Groq returned a category with nothing after the colon
-            parts = ing.split(":", 1)
-            if len(parts) == 2 and not parts[1].strip():
-                continue
-            output += ing + "\n"
-
-        output += "\nStep-by-Step Cooking Instructions\n\n"
-        for i, step in enumerate(steps[:7], 1):
-            step = step.strip()
-            step = re.sub(r'^\d+[\.\)]\s*', '', step).strip()
-            step = re.sub(r'\*\*', '', step).strip()
-            if not step.endswith((".", "!", "?")):
-                step += "."
-            output += f"{i}. {step}\n"
-
-        if tips:
-            output += f"\nTips for Perfect {recipe_name.title()}\n\n"
-            for tip in tips:
-                tip = tip.strip()
-                if not tip.startswith("*"):
-                    tip = "* " + tip
-                output += tip + "\n"
-
-        output += "\nLet me know if you need any clarification on any step, or if you'd like to try something else!\n"
-
-        # Store as current recipe
-        self.current_recipe = {
-            "meal_name": recipe_name.title(),
-            "cuisine_region": cuisine,
-            "ingredients": ingredients,
-            "steps": steps,
-            "tips": tips
+        # Use _display_full_recipe which calls generate_recipe and enriches with Groq
+        recipe_data = {
+            "meal_name":      recipe_name,
+            "cuisine_region": "East Africa",
+            "ingredients":    [],
+            "steps":          [],
+            "introduction":   "",
+            "tips":           [],
         }
-        self.recipe_confirmed = True
-        self.awaiting_recipe_choice = False
 
-        self.llm.add_to_history("user", user_input)
-        self.llm.add_to_history("assistant", output)
-
-        return self._build_response(output, [self.current_recipe])
+        return self._display_full_recipe(recipe_data, user_input)
 
     def _handle_ingredient_based(self, user_input: str, constraints: List) -> Dict:
         """Handle ingredient-based recipe matching with East African focus and deduplication."""
@@ -932,6 +934,18 @@ class JemaEngine:
                         continue
                     output += ing + "\n"
             
+            # Add steps
+            if recipe_data.get('steps'):
+                output += "\nStep-by-Step Cooking Instructions\n\n"
+                for i, step in enumerate(recipe_data.get('steps', [])[:6], 1):
+                    step = step.strip()
+                    if ':' in step:
+                        output += f"{i}. {step}\n"
+                    else:
+                        if not step.endswith((".", "!", "?")):
+                            step += "."
+                        output += f"{i}. {step}\n"
+            
             # Add tips
             if recipe_data.get('tips'):
                 output += "\nTips for Perfect {}\n\n".format(recipe_name)
@@ -1065,6 +1079,25 @@ class JemaEngine:
                 message = "\n".join(recipe_msg)
         
         message += "\n\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
+        
+        # If steps are still empty after enrichment, retry generate_recipe
+        steps = recipe_data.get("steps", [])
+        if not steps and recipe_name:
+            try:
+                if self.debug_mode:
+                    print(f"[DEBUG] Steps missing for {recipe_name} — retrying generate_recipe")
+                cuisine_region = recipe_data.get("cuisine_region", recipe_data.get("country", "East Africa"))
+                retry_dict = self.llm.generate_recipe(
+                    recipe_name=recipe_name,
+                    cuisine_region=cuisine_region
+                )
+                if retry_dict and retry_dict.get("steps"):
+                    steps = retry_dict.get("steps", [])
+                    ingredients = retry_dict.get("ingredients", []) or ingredients
+                    tips = retry_dict.get("tips", []) or tips
+                    introduction = retry_dict.get("introduction", "") or introduction
+            except Exception as e:
+                print(f"Retry generate_recipe error: {e}")
         
         # Lock in recipe
         self.current_recipe = recipe_data

@@ -461,12 +461,12 @@ RECIPE_END"""
                 if not line_stripped:
                     continue
                 # Accept numbered lines: "1.", "1)", "Step 1:"
-                is_numbered = bool(re.match(r'^\d+[\.)\]\s+', line_stripped))
+                is_numbered = bool(re.match(r'^\d+[\.\)]\s+', line_stripped))
                 is_step_label = line_stripped.lower().startswith("step ")
 
                 if is_numbered or is_step_label:
                     # Remove number prefix: "1. " or "1) "
-                    cleaned = re.sub(r'^\d+[\.)\]\s*', '', line_stripped).strip()
+                    cleaned = re.sub(r'^\d+[\.\)]\s*', '', line_stripped).strip()
                     # Remove "Step N:" prefix if present
                     cleaned = re.sub(r'^step\s*\d+[\.):]\*\s*', '', cleaned,
                                      flags=re.IGNORECASE).strip()
@@ -587,7 +587,10 @@ If any section is missing — write it before returning.
             )
             
             response_text = response.choices[0].message.content.strip()
-            return self._parse_recipe(response_text)
+            parsed = self._parse_recipe(response_text, cuisine_region)
+            if not parsed.get("meal_name"):
+                parsed["meal_name"] = recipe_name
+            return parsed
         
         except Exception as e:
             print(f"LLM Error during recipe generation: {e}")
@@ -664,13 +667,16 @@ If any section is missing — write it before returning.
                     intro_lines.append(line)
                 continue
 
-            # If no mode yet and line looks like intro text collect it
+            # If no mode yet and line looks like intro text — collect it
+            # Only use continue if we actually added the line to intro_lines
+            # Otherwise fall through to section header detection below
             if mode is None and line and not line.startswith("*"):
                 if not any(line_lower.startswith(h) for h in
                            ("cuisine:", "essential", "ingredient",
                             "step", "tips", "---", "introduction")):
                     intro_lines.append(line)
-                continue
+                    continue
+                # Line starts with a section keyword — fall through to section header detection
 
             if mode == "ingredients":
                 if line.startswith(("*", "-")):
@@ -714,10 +720,12 @@ If any section is missing — write it before returning.
             introduction = " ".join(intro_lines).strip()
 
         return {
-            "cuisine": cuisine,
-            "introduction": introduction,
-            "ingredients": ingredients,
-            "steps": steps[:6],
-            "tips": tips,
+            "meal_name":      "",
+            "cuisine":        cuisine,
+            "cuisine_region": cuisine,
+            "introduction":   introduction,
+            "ingredients":    ingredients,
+            "steps":          steps[:6],
+            "tips":           tips,
         }
         
