@@ -60,7 +60,8 @@ class JemaCLI:
         """Initialize the JemaEngine."""
         try:
             print("⚙️  Initializing Jema Engine...")
-            self.engine = JemaEngine(excel_path=self.excel_path, debug_mode=self.debug)
+            self.engine = JemaEngine(excel_path=self.excel_path)
+            self.engine.debug_mode = self.debug
             print("✅ Jema Engine ready!\n")
         except FileNotFoundError as e:
             print(f"❌ File not found: {e}")
