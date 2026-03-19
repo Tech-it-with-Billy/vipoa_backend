@@ -22,7 +22,7 @@ class LLMService:
                         value = value.strip()
                         os.environ[key] = value
         
-        api_key = os.environ.get("gsk_MboukUErtBG4fa4BJEecWGdyb3FYAABiHmuBZtr0ObnDuhi9lQnen")
+        api_key = os.environ.get("GROQ_API_KEY")
         
         if not api_key:
             raise ValueError("GROQ_API_KEY not found in .env file")
