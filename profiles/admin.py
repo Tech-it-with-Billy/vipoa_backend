@@ -1,5 +1,22 @@
 from django.contrib import admin
-from .models import Profile
+from .models import Profile, SupabaseUser
+
+
+@admin.register(SupabaseUser)
+class SupabaseUserAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "email",
+        "full_name",
+        "is_active",
+        "is_staff",
+        "is_superuser",
+    )
+    list_filter = ("is_active", "is_staff", "is_superuser")
+    ordering = ("email",)
+    search_fields = ("email", "full_name")
+    readonly_fields = ("date_joined", "updated_at")
+
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):

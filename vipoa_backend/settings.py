@@ -82,8 +82,6 @@ INSTALLED_APPS = [
     "drf_yasg",
 
     # Local Apps
-    "accounts",
-    "api",
     "jema",
     "products",
     "reviews",
@@ -100,10 +98,12 @@ SITE_ID = 1
 # AUTHENTICATION
 # -----------------------------
 
-AUTH_USER_MODEL = "accounts.User"
+AUTH_USER_MODEL = "profiles.SupabaseUser"
+
+# Supabase config
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 
 AUTHENTICATION_BACKENDS = [
-    "accounts.admin_backend.SuperUserOnlyBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
@@ -117,8 +117,7 @@ LOGIN_URL = "/admin/login/"
 REST_FRAMEWORK = {
 
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "profiles.authentication.SupabaseAuthentication",
     ],
 
     "DEFAULT_PERMISSION_CLASSES": [
@@ -225,7 +224,7 @@ DATABASES = {
             f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
         ),
         conn_max_age=600,
-        ssl_require=not DEBUG
+        ssl_require=True
     )
 }
 

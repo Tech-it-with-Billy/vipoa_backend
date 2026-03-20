@@ -45,8 +45,6 @@ urlpatterns = [
     path("api-auth/", include("rest_framework.urls")),
 
     # ---- APP ROUTES ----
-    path("api/accounts/", include("accounts.urls")),
-    path("api/", include("api.urls")),
     path("api/jema/", include("jema.urls")),
     path("api/reviews/", include("reviews.urls")),
     path("api/products/", include("products.urls")),
