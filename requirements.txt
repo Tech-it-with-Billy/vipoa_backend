@@ -43,6 +43,7 @@ pyasn1_modules==0.4.2
 pydantic==2.12.4
 pydantic_core==2.41.5
 PyJWT==2.10.1
+
 python-dotenv==1.2.1
 pytz==2025.2
 PyYAML==6.0.3
