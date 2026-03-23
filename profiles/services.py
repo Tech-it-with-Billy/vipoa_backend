@@ -1,21 +1,27 @@
-# profiles/services.py
 from django.db import transaction
-from .models import Profile
 
 
 @transaction.atomic
-def add_poa_points(profile: Profile, points: int, reason: str = ""):
+def add_poa_points(user, points: int):
     """
-    Safely add PoaPoints to a user's profile.
+    Safely add PoaPoints to a user's wallet.
 
+    - Uses wallet as the source of truth
     - Atomic (prevents race conditions)
-    - Centralized
+    - Creates wallet if missing
     """
 
     if points <= 0:
-        return profile.poa_points
+        return 0
 
-    profile.poa_points += points
-    profile.save(update_fields=["poa_points"])
+    try:
+        from rewards.models import POAWallet
+    except Exception as e:
+        raise Exception(f"Wallet model import failed: {e}")
 
-    return profile.poa_points
+    wallet, _ = POAWallet.objects.get_or_create(user=user)
+
+    wallet.balance += points
+    wallet.save(update_fields=["balance"])
+
+    return wallet.balance

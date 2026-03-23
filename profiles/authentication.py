@@ -15,36 +15,39 @@ logger = logging.getLogger(__name__)
 
 class SupabaseAuthentication(authentication.BaseAuthentication):
     """
-    Authenticate requests using Supabase JWT and ensure
-    local user + profile + wallet exist.
+    Authenticate using Supabase JWT.
+
+    Guarantees:
+    - User exists
+    - Profile exists
+    - Wallet exists
     """
 
     def authenticate(self, request):
+        logger.info("SupabaseAuthentication triggered")
+
         auth_header = authentication.get_authorization_header(request).split()
 
         if not auth_header:
             raise exceptions.AuthenticationFailed("Missing Authorization header")
 
         if len(auth_header) != 2 or auth_header[0].lower() != b"bearer":
-            raise exceptions.AuthenticationFailed("Authorization header must be Bearer token")
+            raise exceptions.AuthenticationFailed("Authorization must be Bearer token")
 
         token = auth_header[1].decode("utf-8")
 
         if not token:
-            raise exceptions.AuthenticationFailed("Empty bearer token")
+            raise exceptions.AuthenticationFailed("Empty token")
 
         user_data = self._get_supabase_user(token)
-
-        if not user_data:
-            raise exceptions.AuthenticationFailed("Invalid or expired Supabase token")
 
         user = self._get_or_create_app_user(user_data)
 
         return (user, None)
 
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
     # SUPABASE USER FETCH
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
     def _get_supabase_user(self, token: str) -> Optional[dict]:
         cache_key = f"supabase_user_{token}"
         cached = cache.get(cache_key)
@@ -64,13 +67,13 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
 
         try:
             response = requests.get(url, headers=headers, timeout=5)
-        except requests.exceptions.RequestException as exc:
+        except requests.exceptions.RequestException:
             logger.exception("Supabase auth request failed")
-            raise exceptions.AuthenticationFailed("Auth server unreachable") from exc
+            raise exceptions.AuthenticationFailed("Auth server unreachable")
 
         if response.status_code != 200:
-            logger.warning(f"Supabase token invalid: {response.text}")
-            raise exceptions.AuthenticationFailed("Invalid Supabase token")
+            logger.warning(f"Invalid Supabase token: {response.text}")
+            raise exceptions.AuthenticationFailed("Invalid token")
 
         data = response.json()
 
@@ -81,22 +84,18 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
 
         return data
 
-    # ------------------------------------------------------------------
-    # USER + PROFILE + WALLET CREATION (CRITICAL FIX)
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
+    # USER + PROFILE + WALLET CREATION (SOURCE OF TRUTH)
+    # --------------------------------------------------
     @transaction.atomic
     def _get_or_create_app_user(self, user_data: dict) -> User:
-        """
-        Ensures:
-        - User exists
-        - Profile exists
-        - Wallet exists
-        """
-
         uid = user_data["id"]
         email = user_data["email"]
         full_name = user_data.get("user_metadata", {}).get("full_name", "")
 
+        # -----------------------------
+        # USER
+        # -----------------------------
         user, created = User.objects.get_or_create(
             id=uid,
             defaults={
@@ -106,9 +105,6 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
             },
         )
 
-        # -----------------------------
-        # UPDATE USER IF EXISTS
-        # -----------------------------
         if not created:
             updated = False
 
@@ -124,7 +120,7 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
                 user.save(update_fields=["email", "full_name"])
 
         # -----------------------------
-        # ENSURE PROFILE EXISTS
+        # PROFILE (NO SIGNALS)
         # -----------------------------
         from profiles.models import Profile
 
@@ -137,18 +133,16 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         )
 
         # -----------------------------
-        # ENSURE WALLET EXISTS
+        # WALLET
         # -----------------------------
         try:
             from rewards.models import POAWallet
 
             POAWallet.objects.get_or_create(
                 user=user,
-                defaults={
-                    "balance": 0
-                }
+                defaults={"balance": 0},
             )
         except Exception as e:
-            logger.warning(f"Wallet creation failed: {e}")
+            logger.error(f"Wallet creation failed: {e}")
 
         return user

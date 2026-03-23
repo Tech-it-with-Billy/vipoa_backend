@@ -207,4 +207,4 @@ class Profile(models.Model):
         return len(self.missing_completion_fields()) == 0
 
     def __str__(self):
-        return f"Profile(user_id={self.user.id})"
+        return f"Profile(user_id={self.user_id})"
