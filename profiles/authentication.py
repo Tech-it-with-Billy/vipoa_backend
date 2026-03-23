@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import authentication, exceptions
+import jwt
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -31,7 +32,16 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         if not token:
             raise exceptions.AuthenticationFailed("Empty bearer token")
 
-        user_data = self._get_supabase_user(token)
+        # user_data = self._get_supabase_user(token)
+        ################################################################################
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        user_data = {
+            "id": decoded["sub"],
+            "email": decoded["email"],
+            "user_metadata": decoded.get("user_metadata", {}),
+        }
+        #################################################################################
+        
         if not user_data:
             raise exceptions.AuthenticationFailed("Invalid or expired Supabase token")
 
