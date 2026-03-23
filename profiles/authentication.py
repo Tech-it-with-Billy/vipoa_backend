@@ -85,6 +85,11 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed("Invalid Supabase payload")
 
         cache.set(cache_key, data, timeout=60)
+        
+        ##############################################################################
+        logger.info(f"HEADERS SENT: {headers}")
+        logger.info(f"SUPABASE URL: {url}")
+        ###############################################################################
         return data
 
     @transaction.atomic
