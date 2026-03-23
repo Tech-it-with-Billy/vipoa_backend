@@ -89,12 +89,22 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
     # --------------------------------------------------
     @transaction.atomic
     def _get_or_create_app_user(self, user_data: dict) -> User:
+        """
+        Ensures:
+        - SupabaseUser exists
+        - Profile exists
+        - POAWallet exists
+        """
+
+        from profiles.models import Profile
+        from rewards.models import POAWallet
+
         uid = user_data["id"]
         email = user_data["email"]
         full_name = user_data.get("user_metadata", {}).get("full_name", "")
 
         # -----------------------------
-        # USER
+        # CREATE OR UPDATE USER
         # -----------------------------
         user, created = User.objects.get_or_create(
             id=uid,
@@ -107,24 +117,19 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
 
         if not created:
             updated = False
-
             if user.email != email:
                 user.email = email
                 updated = True
-
             if full_name and user.full_name != full_name:
                 user.full_name = full_name
                 updated = True
-
             if updated:
                 user.save(update_fields=["email", "full_name"])
 
         # -----------------------------
-        # PROFILE (NO SIGNALS)
+        # CREATE PROFILE IF MISSING
         # -----------------------------
-        from profiles.models import Profile
-
-        Profile.objects.get_or_create(
+        profile, _ = Profile.objects.get_or_create(
             user=user,
             defaults={
                 "email": email,
@@ -133,16 +138,11 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         )
 
         # -----------------------------
-        # WALLET
+        # CREATE WALLET IF MISSING
         # -----------------------------
-        try:
-            from rewards.models import POAWallet
-
-            POAWallet.objects.get_or_create(
-                user=user,
-                defaults={"balance": 0},
-            )
-        except Exception as e:
-            logger.error(f"Wallet creation failed: {e}")
+        wallet, _ = POAWallet.objects.get_or_create(
+            user=user,
+            defaults={"balance": 0},
+        )
 
         return user
