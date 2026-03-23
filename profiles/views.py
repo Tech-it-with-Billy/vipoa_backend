@@ -14,7 +14,7 @@ class ProfileMeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response(ProfileReadSerializer(request.user.profile).data, status=status.HTTP_200_OK)
+        return Response(ProfileReadSerializer(request.user.profile).data)
 
     def patch(self, request):
         profile = request.user.profile
@@ -22,7 +22,7 @@ class ProfileMeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         profile.refresh_from_db()
-        return Response(ProfileReadSerializer(profile).data, status=status.HTTP_200_OK)
+        return Response(ProfileReadSerializer(profile).data)
 
 
 class ProfileUpdateView(APIView):
@@ -34,7 +34,7 @@ class ProfileUpdateView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         profile.refresh_from_db()
-        return Response(ProfileReadSerializer(profile).data, status=status.HTTP_200_OK)
+        return Response(ProfileReadSerializer(profile).data)
 
     def put(self, request):
         return self.patch(request)
@@ -48,11 +48,9 @@ class ProfileCompletionStatusView(APIView):
         missing = profile.missing_completion_fields()
         completed = len(PROFILE_COMPLETION_FIELDS) - len(missing)
         total = len(PROFILE_COMPLETION_FIELDS)
-
         data = {
             "is_complete": len(missing) == 0,
             "missing_fields": missing,
             "completion_percentage": round(completed / total, 2),
         }
-
-        return Response(ProfileCompletionStatusSerializer(data).data, status=status.HTTP_200_OK)
+        return Response(ProfileCompletionStatusSerializer(data).data)

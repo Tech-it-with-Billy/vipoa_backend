@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Profile
 from .constants import PROFILE_COMPLETION_FIELDS
+from rewards.services.events import award_profile_completion
 
 
 class ProfileReadSerializer(serializers.ModelSerializer):
@@ -40,6 +41,14 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             "profile_completed_awarded",
             "updated_at",
         ]
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        if instance.is_profile_complete() and not instance.profile_completed_awarded:
+            award_profile_completion(user=instance.user)
+            instance.profile_completed_awarded = True
+            instance.save(update_fields=["profile_completed_awarded"])
+        return instance
 
 
 class ProfileCompletionStatusSerializer(serializers.Serializer):
