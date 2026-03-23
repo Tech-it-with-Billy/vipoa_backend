@@ -125,7 +125,7 @@ class Profile(models.Model):
     def poa_points(self):
         try:
             return self.user.poa_wallet.balance
-        except Exception:
+        except AttributeError:
             return 0
 
     # -----------------------------

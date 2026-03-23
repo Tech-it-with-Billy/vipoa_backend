@@ -35,35 +35,14 @@ class ProfileReadSerializer(serializers.ModelSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        exclude = [
-            "user",
-            "day_streak",
-            "profile_completed_awarded",
-            "updated_at",
-        ]
+        exclude = ["user", "day_streak", "profile_completed_awarded", "updated_at"]
 
     def update(self, instance, validated_data):
-        # First, update the profile fields
         instance = super().update(instance, validated_data)
-
-        # Only try awarding if profile is complete and not yet awarded
         if instance.is_profile_complete() and not instance.profile_completed_awarded:
-            try:
-                # Attempt to award profile completion points
-                award_profile_completion(user=instance.user)
-
-                # Mark as awarded if successful
-                instance.profile_completed_awarded = True
-                instance.save(update_fields=["profile_completed_awarded"])
-
-            except Exception as e:
-                # Log the error instead of letting it raise a 500
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.exception(
-                    f"Failed to award profile completion for user {instance.user.id}: {str(e)}"
-                )
-
+            award_profile_completion(user=instance.user)
+            instance.profile_completed_awarded = True
+            instance.save(update_fields=["profile_completed_awarded"])
         return instance
 
 
