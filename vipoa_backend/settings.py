@@ -102,6 +102,8 @@ AUTH_USER_MODEL = "profiles.SupabaseUser"
 
 # Supabase config
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+SUPABASE_AUDIENCE = "authenticated"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",

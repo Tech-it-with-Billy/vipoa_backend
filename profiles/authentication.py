@@ -1,12 +1,16 @@
 import logging
+import hashlib
 from typing import Optional
+
 import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import authentication, exceptions
-import jwt
+
+from jose import jwt
+from jose.exceptions import JWTError
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -14,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 class SupabaseAuthentication(authentication.BaseAuthentication):
     """
-    Authenticate requests using Supabase JWT and ensure
-    local user exists (profile/wallet creation handled via signals)
+    Production-grade Supabase JWT authentication using JWKS (no API calls)
     """
 
     def authenticate(self, request):
@@ -25,93 +28,121 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed("Missing Authorization header")
 
         if len(auth_header) != 2 or auth_header[0].lower() != b"bearer":
-            raise exceptions.AuthenticationFailed("Authorization header must be Bearer token")
+            raise exceptions.AuthenticationFailed("Invalid Authorization header")
 
         token = auth_header[1].decode("utf-8")
 
         if not token:
-            raise exceptions.AuthenticationFailed("Empty bearer token")
+            raise exceptions.AuthenticationFailed("Empty token")
 
-        # user_data = self._get_supabase_user(token)
-        ################################################################################
-        decoded = jwt.decode(token, options={"verify_signature": False})
-        user_data = {
-            "id": decoded["sub"],
-            "email": decoded["email"],
-            "user_metadata": decoded.get("user_metadata", {}),
-        }
-        #################################################################################
-        
-        if not user_data:
-            raise exceptions.AuthenticationFailed("Invalid or expired Supabase token")
+        user_data = self._verify_jwt(token)
 
-        user = self._get_or_create_app_user(user_data)
-
-        # Optional: check profile completion on login
-        if hasattr(user, "profile"):
-            profile = user.profile
-            if profile.is_profile_complete() and not profile.profile_completed_awarded:
-                from rewards.services.events import award_profile_completion
-                profile.profile_completed_awarded = True
-                profile.save(update_fields=["profile_completed_awarded"])
-                award_profile_completion(user=user)
+        user = self._get_or_create_user(user_data)
 
         return (user, None)
 
-    def _get_supabase_user(self, token: str) -> Optional[dict]:
-        cache_key = f"supabase_user_{token}"
-        cached = cache.get(cache_key)
-        if cached:
-            return cached
+    # ------------------------------------------------------------------
+    # VERIFY JWT USING SUPABASE JWKS
+    # ------------------------------------------------------------------
+    def _verify_jwt(self, token: str) -> dict:
+        try:
+            # Decode header to get key id (kid)
+            headers = jwt.get_unverified_header(token)
+            kid = headers.get("kid")
 
-        if not settings.SUPABASE_URL:
-            raise exceptions.AuthenticationFailed("SUPABASE_URL not configured")
+            if not kid:
+                raise exceptions.AuthenticationFailed("Invalid token header")
 
-        url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/user"
-        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+            # Fetch JWKS (cached)
+            jwks = self._get_jwks()
+
+            key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
+
+            if not key:
+                raise exceptions.AuthenticationFailed("Public key not found")
+
+            # Verify token
+            payload = jwt.decode(
+                token,
+                key,
+                algorithms=["ES256"],
+                audience=settings.SUPABASE_AUDIENCE,
+                issuer=f"{settings.SUPABASE_URL}/auth/v1",
+            )
+
+            return payload
+
+        except JWTError as e:
+            logger.warning(f"JWT verification failed: {str(e)}")
+            raise exceptions.AuthenticationFailed("Invalid or expired token")
+
+    # ------------------------------------------------------------------
+    # FETCH JWKS (WITH CACHE)
+    # ------------------------------------------------------------------
+    def _get_jwks(self) -> dict:
+        cache_key = "supabase_jwks"
+        jwks = cache.get(cache_key)
+
+        if jwks:
+            return jwks
 
         try:
-            response = requests.get(url, headers=headers, timeout=5)
-        except requests.exceptions.RequestException as exc:
-            logger.exception("Supabase auth request failed")
-            raise exceptions.AuthenticationFailed("Auth server unreachable") from exc
+            response = requests.get(settings.SUPABASE_JWKS_URL, timeout=5)
+            response.raise_for_status()
+            jwks = response.json()
 
-        if response.status_code != 200:
-            logger.warning(f"Supabase token invalid: {response.text}")
-            raise exceptions.AuthenticationFailed("Invalid Supabase token")
+            cache.set(cache_key, jwks, timeout=3600)  # cache 1 hour
 
-        data = response.json()
-        if not data.get("id") or not data.get("email"):
-            raise exceptions.AuthenticationFailed("Invalid Supabase payload")
+            return jwks
 
-        cache.set(cache_key, data, timeout=60)
-        
-        ##############################################################################
-        logger.info(f"HEADERS SENT: {headers}")
-        logger.info(f"SUPABASE URL: {url}")
-        ###############################################################################
-        return data
+        except Exception as e:
+            logger.exception("Failed to fetch JWKS")
+            raise exceptions.AuthenticationFailed("Auth server error")
 
+    # ------------------------------------------------------------------
+    # USER CREATION
+    # ------------------------------------------------------------------
     @transaction.atomic
-    def _get_or_create_app_user(self, user_data: dict) -> User:
-        uid = user_data["id"]
-        email = user_data["email"]
-        full_name = user_data.get("user_metadata", {}).get("full_name", "")
+    def _get_or_create_user(self, payload: dict) -> User:
+        uid = payload["sub"]
+        email = payload.get("email", "")
+        full_name = payload.get("user_metadata", {}).get("full_name", "")
 
         user, created = User.objects.get_or_create(
             id=uid,
-            defaults={"email": email, "full_name": full_name, "is_active": True},
+            defaults={
+                "email": email,
+                "full_name": full_name,
+                "is_active": True,
+            },
         )
 
         if not created:
             updated = False
-            if user.email != email:
+
+            if email and user.email != email:
                 user.email = email
                 updated = True
+
             if full_name and user.full_name != full_name:
                 user.full_name = full_name
                 updated = True
+
             if updated:
                 user.save(update_fields=["email", "full_name"])
+
+        # Ensure Profile + Wallet
+        from profiles.models import Profile
+        from rewards.models.wallet import PoaPointsAccount
+
+        Profile.objects.get_or_create(
+            user=user,
+            defaults={"email": email, "name": full_name},
+        )
+
+        PoaPointsAccount.objects.get_or_create(
+            user=user,
+            defaults={"balance": 0},
+        )
 
         return user
