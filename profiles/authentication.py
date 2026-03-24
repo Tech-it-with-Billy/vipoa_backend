@@ -25,10 +25,10 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         auth_header = authentication.get_authorization_header(request).split()
 
         if not auth_header:
-            raise exceptions.AuthenticationFailed("Missing Authorization header")
+            return None
 
         if len(auth_header) != 2 or auth_header[0].lower() != b"bearer":
-            raise exceptions.AuthenticationFailed("Invalid Authorization header")
+            return None
 
         token = auth_header[1].decode("utf-8")
 
@@ -38,6 +38,10 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         user_data = self._verify_jwt(token)
 
         user = self._get_or_create_user(user_data)
+        
+        logger.info(f"AUTH HEADER: {auth_header}")
+        logger.info(f"USER DATA: {user_data}")
+        logger.info("🔥 AUTHENTICATION RUNNING")
 
         return (user, None)
 
@@ -144,5 +148,7 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
             user=user,
             defaults={"balance": 0},
         )
+        
+        logger.info("🔥 USER CREATION RUNNING")
 
         return user
