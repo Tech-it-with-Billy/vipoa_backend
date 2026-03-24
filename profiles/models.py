@@ -6,6 +6,9 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 
+from rewards.services.events import award_profile_completion
+from rewards.services.wallet import get_or_create_wallet
+
 from .constants import PROFILE_COMPLETION_FIELDS
 
 
@@ -123,10 +126,8 @@ class Profile(models.Model):
     # -----------------------------
     @property
     def poa_points(self):
-        try:
-            return self.user.poa_wallet.balance
-        except Exception:
-            return 0
+        wallet = get_or_create_wallet(self.user)
+        return wallet.balance
 
     # -----------------------------
     # AGE
