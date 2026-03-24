@@ -10,6 +10,8 @@ from rest_framework import authentication, exceptions
 from jose import jwt
 from jose.exceptions import JWTError
 
+from django.db import transaction, IntegrityError
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -93,31 +95,61 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
     # -----------------------------
     # GET OR CREATE USER (without creating Profile or Wallet)
     # -----------------------------
+    @transaction.atomic
     def _get_or_create_user(self, payload: dict) -> User:
+        """
+        Safely get or create a SupabaseUser based on JWT payload.
+        Ensures:
+        - Email uniqueness
+        - Profile and PoaPointsAccount exist
+        """
         uid = payload["sub"]
-        email = payload.get("email", "")
+        email = payload.get("email", "").lower()
         full_name = payload.get("user_metadata", {}).get("full_name", "")
 
-        user, created = User.objects.get_or_create(
-            id=uid,
-            defaults={
-                "email": email,
-                "full_name": full_name,
-                "is_active": True,
-            },
-        )
+        # Try to find by UID first
+        user = User.objects.filter(id=uid).first()
 
-        if not created:
-            updated = False
-            if email and user.email != email:
-                user.email = email
-                updated = True
+        if not user:
+            # If UID doesn't exist, try to find by email (enforce unique)
+            user = User.objects.filter(email=email).first()
+
+        if user:
+            # Update info if changed
+            updated_fields = []
             if full_name and user.full_name != full_name:
                 user.full_name = full_name
-                updated = True
-            if updated:
-                user.save(update_fields=["email", "full_name"])
+                updated_fields.append("full_name")
+            if user.email != email:
+                user.email = email
+                updated_fields.append("email")
+            if updated_fields:
+                user.save(update_fields=updated_fields)
+        else:
+            # Create user safely, handle race condition
+            try:
+                user = User.objects.create(
+                    id=uid,
+                    email=email,
+                    full_name=full_name,
+                    is_active=True,
+                )
+            except IntegrityError:
+                # Likely another process created it concurrently
+                user = User.objects.get(email=email)
 
-        # ⚡ No Profile or Wallet creation here! Signals handle that.
+        # Ensure Profile exists
+        from profiles.models import Profile
+        Profile.objects.get_or_create(
+            user=user,
+            defaults={"name": full_name, "email": email},
+        )
+
+        # Ensure PoaPointsAccount exists
+        from rewards.models.wallet import PoaPointsAccount
+        PoaPointsAccount.objects.get_or_create(
+            user=user,
+            defaults={"balance": 0},
+        )
 
         return user
