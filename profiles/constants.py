@@ -11,7 +11,6 @@ PROFILE_COMPLETION_FIELDS = [
     "eating_realities",
     "medical_restrictions",
     "allergies",
-    "dislikes",
     "cooking_skills",
     "diet",
     "religion",
