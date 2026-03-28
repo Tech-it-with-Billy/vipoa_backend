@@ -47,7 +47,7 @@ class LLMService:
             self.client = None
 
         self.system_prompt_template = """You are Jema, a friendly African cooking assistant. 
-Help users discover meals and prepare dishes from Kenya, Uganda, Tanzania, Ethiopia, Rwanda, Burundi, South Sudan, and Swahili cuisine.
+ng Help users discover meals and prepare dishes from across the African continent — all African cuisines are welcome.
 
 Style: short, simple, friendly, to the point. Plain text only.
 
@@ -171,7 +171,7 @@ Return just the enhanced step numbers and instructions. Keep each step under 50 
             
             return steps
 
-    def generate_east_african_recipe_from_ingredients(
+    def generate_african_recipe_from_ingredients(
         self,
         user_ingredients: List[str],
         exclude_names: List[str],
@@ -179,10 +179,11 @@ Return just the enhanced step numbers and instructions. Keep each step under 50 
         language: str = "en"
     ) -> List[Dict]:
         """
-        Generate East African recipe suggestions from ingredients.
+        Generate authentic African recipe suggestions from ingredients across all African regions.
         
-        Generates recipes using Groq LLM constrained to East African cuisine.
+        Generates diverse recipes using Groq LLM from all African cuisines (not just East African).
         Excludes recipes already found in the database to prevent duplicates.
+        Emphasizes variety — if multiple recipes fit, randomly select from different regions.
         
         Args:
             user_ingredients: List of normalized ingredient names (e.g., ["rice", "beef", "onion"])
@@ -195,7 +196,7 @@ Return just the enhanced step numbers and instructions. Keep each step under 50 
             Returns empty list if generation fails or LLM is unavailable.
         
         Example:
-            recipes = llm.generate_east_african_recipe_from_ingredients(
+            recipes = llm.generate_african_recipe_from_ingredients(
                 user_ingredients=["rice", "beef", "onion"],
                 exclude_names=["Biriani"],
                 count=2,
@@ -211,59 +212,81 @@ Return just the enhanced step numbers and instructions. Keep each step under 50 
         # Prepare exclude string
         exclude_str = ", ".join(exclude_names) if exclude_names else "none"
         
-        # Build the prompt with strict rules
-        prompt = f"""You are Jema, an expert African cooking assistant specializing in East African cuisine.
+        # Build the prompt with strict rules for continental diversity
+        prompt = f"""You are Jema, an expert African cooking assistant celebrating all African cuisines equally.
 
 THE USER HAS EXACTLY THESE INGREDIENTS: {ingredients_str}
 
-YOUR ONLY JOB: Suggest exactly {count} African dish(es) where ALL of these ingredients are the PRIMARY components.
+YOUR ONLY JOB: Suggest exactly {count} authentic African dish(es) where ALL of these ingredients are the PRIMARY components.
+
+CRITICAL DIVERSITY REQUIREMENT: 
+- You MUST suggest recipes from DIFFERENT African regions/countries
+- If you suggest {count} recipes, try to represent {count} different countries/regions when possible
+- DO NOT favor East Africa — give equal consideration to West Africa, Southern Africa, North Africa, Central Africa
+- When multiple valid options exist, RANDOMLY select from different regions
+- Example for {count}=2: one from West Africa AND one from East Africa, OR one from North Africa AND one from Southern Africa
 
 BEFORE SUGGESTING ANYTHING run this check for each dish:
 1. Does this dish use ALL of {ingredients_str} as main components?
 2. Is this dish known by this exact name in its country without a country prefix?
 3. If removing the country name leaves a meaningless description — REJECT it and find a real dish
+4. Is this dish from a different region than other suggestions? (If yes, prioritize it)
 
 REAL DISH NAME TEST — apply this test to every suggestion:
-PASS examples — these are real recognized dish names:
+PASS examples — these are real recognized dish names from across Africa:
 - Rolex ✅ recognized Ugandan name on its own
 - Ugali Mayai ✅ recognized Kenyan name on its own
 - Chapati Mayai ✅ recognized name on its own
-- Pilau ✅ recognized name on its own
+- Pilau ✅ recognized East African name on its own
 - Ndengu ✅ recognized Kenyan name on its own
 - Biriani ✅ recognized Tanzanian name on its own
-- Kuku Mchuzi ✅ recognized Kenyan name on its own
+- Jollof Rice ✅ recognized West African name on its own
+- Fufu ✅ recognized West African name on its own
+- Peanut Butter Stew ✅ recognized name on its own
+- Tagine ✅ recognized North African name on its own
+- Pap ✅ recognized Southern African name on its own
+- Couscous ✅ recognized North African name on its own
 - Matoke ✅ recognized Ugandan name on its own
 
 FAIL examples — these are invented names, never use them:
 - Ugandan Rolex ❌ real name is just Rolex
 - Kenyan Egg Stew ❌ invented description
 - Ethiopian Scrambled Eggs ❌ not a real dish name
-- Eritrean Frittered Eggs ❌ completely invented
-- Scotch Eggs with Sukuma Wiki ❌ invented fusion
-- Egg and Vegetable Tagine ❌ Tagine is Moroccan not East African
-- Kuku wa Nyama ❌ means chicken of meat which is nonsense
+- West African Rice Bowl ❌ invented description
+- Nigerian Beef Stew ❌ use real name if one exists
 - Tanzanian Rice Dish ❌ invented description
-- Ugandan Lentil Curry ❌ invented, use Ndengu instead
+- Ugandan Lentil Curry ❌ invented, use real dish names
 
-MANDATORY INGREDIENT MATCHING — use this to select the correct dish:
+INGREDIENT EXAMPLES FROM ACROSS AFRICA — use these as reference:
+EAST AFRICAN options:
 - eggs + onion + bell pepper → Ugali Mayai (Kenya), Rolex (Uganda), Chapati Mayai (Kenya)
-- eggs + onion + tomato → Ugali Mayai (Kenya), Rolex (Uganda), Chapati Mayai (Kenya)
-- eggs + onion → Ugali Mayai (Kenya), Rolex (Uganda), Chapati Mayai (Kenya)
-- rice + beef + onion → Pilau (Kenya), Biriani (Tanzania), Rice and Beef Stew (Kenya)
-- rice + chicken + onion → Pilau (Kenya), Kuku Mchuzi (Kenya), Biryani (Kenya)
-- beans + onion + tomato → Beans Stew (Kenya), Githeri (Kenya), Maharagwe (Tanzania)
-- chicken + onion + tomato → Kuku Mchuzi (Kenya), Kuku wa Kupaka (Kenya)
+- rice + beef + onion → Pilau (Kenya), Biriani (Tanzania/Kenya)
+- beans + onion + tomato → Beans Stew (Kenya), Githeri (Kenya)
+- chicken + onion + tomato → Kuku Mchuzi (Kenya), Kuku wa Kupaka (Tanzania)
 - lentils + onion → Ndengu (Kenya), Misir Wot (Ethiopia)
-- potato + onion → Irio (Kenya), Mukimo (Kenya), Viazi Karai (Kenya)
-- kale + onion → Sukuma Wiki (Kenya), Githeri (Kenya)
-- fish + coconut milk → Samaki wa Kupaka (Kenya), Samaki wa Nazi (Tanzania)
+- fish + coconut milk → Samaki wa Kupaka (Kenya/Tanzania)
 - banana + meat → Matoke (Uganda), Katogo (Uganda)
-- maize + beans → Githeri (Kenya), Muthokoi (Kenya)
 
-PRIORITY ORDER:
-1. FIRST — East African dishes from Kenya, Tanzania, Uganda, Rwanda, Burundi, Somalia
-2. SECOND — broader African dishes only if no East African dish fits ALL of {ingredients_str}
-3. NEVER suggest non-African dishes
+WEST AFRICAN options:
+- rice + tomato + onion + chicken → Jollof Rice (Nigeria/Ghana), Benachin (Senegal)
+- groundnuts + chicken + onion → Peanut Butter Stew (West Africa), Groundnut Soup (Ghana)
+- plantain + cassava → Fufu (Ghana/Nigeria), Cassava and Plantain (multiple West African countries)
+- rice + black-eyed peas + onion → Hoppin' John variant (West Africa)
+
+NORTH AFRICAN options:
+- lamb + apricot + onion → Tagine (Morocco), Tajine (Algeria)
+- chickpeas + couscous + onion → Couscous (Morocco/Algeria/Tunisia)
+- chicken + preserved lemon → Chicken Tagine (Morocco)
+
+SOUTHERN AFRICAN options:
+- maize meal + water → Sadza (Zimbabwe/Botswana), Pap (South Africa)
+- beef + onion + tomato → Potjiekos (South Africa), Beef Stew (Zimbabwe)
+
+CONTINENTAL SELECTION RULE:
+1. If you have East African + West African + Central/North/South African options, suggest one from EACH region
+2. If you only have East African options, suggest East African
+3. NEVER suggest multiple dishes from the same country unless absolutely necessary
+4. Maximum 1 recipe per country — prefer diversity across countries
 
 STRICT RULES:
 1. NEVER invent a dish name by combining a country name with a generic food description
@@ -271,11 +294,13 @@ STRICT RULES:
 3. Do NOT suggest any of these already found recipes: {exclude_str}
 4. Do NOT suggest two dishes that are the same recipe with different spellings
 5. Cuisine MUST be the specific country where this dish is genuinely known by locals
+6. WHEN IN DOUBT about which of multiple valid recipes to suggest, RANDOMLY CHOOSE to ensure variety
 
 FINAL CHECK before returning your answer:
 - Are all dish names real recognized African names that exist without a country prefix?
 - Do all dishes use ALL of {ingredients_str} as primary components?
 - Are there any duplicates or invented names?
+- Do the suggested recipes represent different African regions/countries when possible?
 
 Return EXACTLY this plain text format repeated {count} time(s).
 No JSON. No markdown. No preamble. Nothing before the first RECIPE_START:
@@ -290,47 +315,42 @@ Introduction
 
 Essential Ingredients
 
-* Starch: <quantity> <ingredient> (<preparation note>)
-* Protein: <quantity> <ingredient> (<preparation note>)
-* Aromatics: <quantity> <ingredient> (<prep note>), <quantity> <ingredient> (<prep note>)
-* Vegetables: <quantity> <ingredient> (<prep note>)
-* Spices: <quantity> <spice> (<note>)
-* Fat: <quantity> <oil or fat>
-* Optional: <ingredient> (<note>)
+Starch: <quantity> <ingredient> (<preparation note>)
+Protein: <quantity> <ingredient> (<preparation note>)
+Aromatics: <quantity> <ingredient> (<prep note>)
+Vegetables: <quantity> <ingredient> (<prep note>)
+Spices: <quantity> <spice> (<note>)
+Fat: <quantity> <oil or fat>
+Optional: <ingredient> (<note>)
 
-Use ONLY these category labels: Starch, Grain, Protein, Aromatics, Vegetables, Spices, Liquid, Fat, Optional
-Every ingredient line MUST start with * and follow: * Category: quantity ingredient (note)
-ALL of these ingredients MUST appear in the list: {ingredients_str}
+(Only include categories that have ingredients.)
 
 Step-by-Step Cooking Instructions
 
-1. <Step Title>: <Detailed instruction with technique and timing.>
-2. <Step Title>: <Detailed instruction with technique and timing.>
-3. <Step Title>: <Detailed instruction with technique and timing.>
-4. <Step Title>: <Detailed instruction with technique and timing.>
-5. <Step Title>: <Detailed instruction with technique and timing.>
-6. <Step Title>: <Detailed instruction with technique and timing.>
-
-IMPORTANT: You MUST include exactly 4 to 6 steps. Never skip this section.
-Every step MUST have a title followed by a colon then the instruction.
+1. <Step Title>: <Detailed instruction>
+2. <Step Title>: <Detailed instruction>
+3. <Step Title>: <Detailed instruction>
+4. <Step Title>: <Detailed instruction>
+5. <Step Title>: <Detailed instruction>
+6. <Step Title>: <Detailed instruction>
 
 Tips for Perfect <Meal Name>
 
-* <Tip Label>: <Practical explanation>
-* <Tip Label>: <Practical explanation>
-* Serve with: <Serving suggestion>
+<Tip 1>
+<Tip 2>
+Serve with: <Serving suggestion>
 RECIPE_END"""
         
         try:
             self._wait_for_rate_limit()
             response = self.client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "You are an expert at generating authentic East African recipes in plain text format only."},
+                    {"role": "system", "content": "You are an expert at generating authentic African recipes in plain text format only. Prioritize continental diversity and avoid East African bias. When multiple options exist from different African regions, randomly select to ensure variety."},
                     {"role": "user", "content": prompt}
                 ],
                 model="llama-3.3-70b-versatile",
                 max_tokens=1800,  # Reduced from 3000 (significant savings!)
-                temperature=0.3
+                temperature=0.5  # Increased to 0.5 to encourage more randomization and diversity
             )
             
             response_text = response.choices[0].message.content.strip()
@@ -341,7 +361,7 @@ RECIPE_END"""
         
         except Exception as e:
             error_msg = str(e)
-            print(f"LLM Error during recipe generation: {error_msg}")
+            print(f"LLM Error during recipe generation: {e}")
             
             # Handle rate limit errors gracefully
             if "rate_limit" in error_msg.lower() or "429" in error_msg:
@@ -349,6 +369,26 @@ RECIPE_END"""
                 return []  # Return empty list; caller will use database fallback
             
             return []
+    
+    def generate_east_african_recipe_from_ingredients(
+        self,
+        user_ingredients: List[str],
+        exclude_names: List[str],
+        count: int,
+        language: str = "en"
+    ) -> List[Dict]:
+        """
+        DEPRECATED: Use generate_african_recipe_from_ingredients instead.
+        This method is kept for backwards compatibility.
+        
+        Now calls the continental diversity version that covers all African cuisines equally.
+        """
+        return self.generate_african_recipe_from_ingredients(
+            user_ingredients=user_ingredients,
+            exclude_names=exclude_names,
+            count=count,
+            language=language
+        )
     
     def _parse_plain_text_recipes(self, text: str, expected_count: int) -> List[Dict]:
         """Parse plain text recipes in RECIPE_START...RECIPE_END format."""
@@ -449,10 +489,12 @@ RECIPE_END"""
                 if line_stripped and not line_stripped.startswith("*"):
                     intro_text.append(line_stripped)
             
-            # Parse ingredients (lines starting with *)
+            # Parse ingredients (lines with category labels)
             elif mode == "ingredients":
-                if line_stripped.startswith("*"):
-                    ing = line_stripped.lstrip("*").strip()
+                # Accept lines that start with a category label (followed by colon)
+                if ":" in line_stripped:
+                    # Remove leading asterisks and dashes, then parse
+                    ing = line_stripped.lstrip("*-").strip()
                     if ing:
                         ingredients.append(ing)
             
@@ -480,16 +522,24 @@ RECIPE_END"""
                     if continuation:
                         steps[-1] = steps[-1].rstrip(".") + " " + continuation
             
-            # Parse tips (lines starting with *)
+            # Parse tips (remove asterisks and dashes)
             elif mode == "tips":
-                if line_stripped.startswith("*"):
-                    tip = line_stripped.lstrip("*").strip()
-                    if tip:
+                if line_stripped and not line_stripped.startswith(("Serve", "serve")):
+                    # Remove leading asterisks and dashes
+                    tip = line_stripped.lstrip("*-").strip()
+                    if tip and len(tip) > 5:
                         tips.append(tip)
+                elif line_stripped.lower().startswith("serve"):
+                    # Keep serve suggestion
+                    tip = line_stripped.lstrip("*-").strip()
+                    tips.append(tip)
         
         # Finish intro collection if still collecting
         if intro_text:
             introduction = " ".join(intro_text).strip()
+        
+        # Limit tips to 2-3 items max (keep first 3 items to ensure variety but controlled)
+        tips = tips[:3]
         
         # Return recipe if we have at least meal_name and basic content
         if meal_name and cuisine_region and ingredients and steps:
@@ -504,103 +554,314 @@ RECIPE_END"""
         
         return None
 
-    def generate_recipe(self, recipe_name: str, cuisine_region: str = "") -> Dict:
+    def generate_recipe(self, recipe_name: str, cuisine_region: str = "", language: str = "english") -> str:
         """
-        Generate a detailed East African recipe using Groq.
+        Generate a fully formatted recipe using grounded source hierarchy.
+        Always uses Groq for consistent formatting of all recipes.
         
-        Returns a dict with keys: cuisine, introduction, ingredients, steps, tips
+        1. PDF recipe store (verified African cookbook)
+        2. Web search (Tavily - trusted African cooking sites)
+        3. Groq standalone (flagged as AI-generated)
+        
+        Returns the formatted recipe as a string with exact structure:
+        - "Great! Here's the recipe for [Name]"
+        - Introduction paragraph
+        - Cuisine: [Region]
+        - Essential Ingredients (categorized)
+        - Step-by-Step Cooking Instructions (numbered)
+        - Tips for Perfect [Name]
         """
         if self.client is None:
-            return {}
-        
-        prompt = f"""SYSTEM INSTRUCTION: You are Jema, an expert East African cooking assistant. You MUST return the recipe in the EXACT structured format shown below. Do NOT return prose paragraphs. Do NOT skip any section. Follow the format character by character.
+            print("[generate_recipe] Groq client not initialized. Check GROQ_API_KEY.")
+            return ""
 
-Recipe: {recipe_name}
-{"Cuisine: " + cuisine_region if cuisine_region else ""}
+        grounded_context = None
+        source_label = None
+        pdf_recipe = None
 
-Return using EXACTLY this structure — all 4 sections are mandatory:
+        # --- SOURCE 1: PDF COOKBOOK ---
+        try:
+            from jema.services.pdf_recipe_store import get_pdf_store
+            pdf_store = get_pdf_store()
 
-Introduction
-[2 to 3 sentences about this dish — its country of origin, cultural significance, and the defining technique or ingredient.]
+            # Check for compound meal first (e.g. Ugali Mayai = Ugali + Egg Stew)
+            pdf_recipe = pdf_store.lookup_compound(recipe_name)
 
-Cuisine: [Specific country e.g. Kenya, Tanzania, Uganda, Ethiopia]
+            # If not compound, check single recipe lookup
+            if not pdf_recipe:
+                pdf_recipe = pdf_store.lookup(recipe_name)
+
+            if pdf_recipe and pdf_recipe.get("steps"):
+                is_compound = pdf_recipe.get("is_compound", False)
+                steps_text = "\n".join(pdf_recipe.get("steps", []))
+                ingredients_text = pdf_recipe.get("ingredients_raw", "")
+                
+                grounded_context = (
+                    f"VERIFIED SOURCE: African Recipes PDF Cookbook\n\n"
+                    f"Ingredients:\n{ingredients_text}\n\n"
+                    f"Steps:\n{steps_text}"
+                )
+                source_label = "PDF"
+        except Exception as e:
+            pass  # Silent fail, will try other sources
+
+        # --- SOURCE 2: WEB SEARCH ---
+        if not grounded_context:
+            try:
+                from jema.services.web_search_service import WebSearchService
+                web_service = WebSearchService()
+                if web_service.is_available():
+                    web_result = web_service.search_recipe(recipe_name)
+                    if web_result:
+                        grounded_context = f"VERIFIED SOURCE: Web Search (Trusted African Cooking Sites)\n\n{web_result}"
+                        source_label = "TAVILY"
+            except Exception as e:
+                pass  # Silent fail, will try Groq
+
+        # --- SOURCE 3: GROQ STANDALONE (flagged) ---
+        if not grounded_context:
+            source_label = "GROQ"
+
+        # --- BUILD SYSTEM PROMPT ---
+        system_prompt = f"""You are Jema, a friendly African cooking assistant. Format every recipe EXACTLY like this:
+
+[Introduction paragraph - 2-3 sentences about the dish, its origin, and significance]
+
+Cuisine: [Country or Region]
 
 Essential Ingredients
 
-* Starch: [quantity] [ingredient] ([preparation note])
-* Protein: [quantity] [ingredient] ([preparation note])
-* Aromatics: [quantity] [ingredient] ([prep note]), [quantity] [ingredient] ([prep note])
-* Spices: [quantity] [spice name] ([whole vs ground, alternatives])
-* Liquid: [quantity] [liquid] ([alternative in brackets])
-* Fat: [quantity] [oil or fat type]
-* Optional: [ingredient] ([note])
-
-INGREDIENT RULES:
-- Category labels allowed: Starch, Grain, Protein, Aromatics, Vegetables, Spices, Liquid, Fat, Optional
-- Every line starts with * then Category: quantity ingredient (note)
-- Include ALL ingredients needed to cook this dish from scratch for 4 servings
-- Be specific with quantities — never write "some" or "to taste" for main ingredients
+* Starch: [ingredient with amount, or none]
+* Protein: [ingredient with amount, or none]
+* Aromatics: [ingredient with amount, or none]
+* Vegetables: [ingredient with amount, or none]
+* Spices: [ingredient with amount, or none]
+* Fat: [ingredient with amount, or none]
+* Optional: [ingredient with amount, or none]
 
 Step-by-Step Cooking Instructions
 
-1. [Step Title]: [2 sentences — what to do, how long, and what to look for when done.]
-2. [Step Title]: [2 sentences — what to do, how long, and what to look for when done.]
-3. [Step Title]: [2 sentences — what to do, how long, and what to look for when done.]
-4. [Step Title]: [2 sentences — what to do, how long, and what to look for when done.]
-5. [Step Title]: [2 sentences — what to do, how long, and what to look for when done.]
-6. [Step Title]: [2 sentences — what to do, how long, and what to look for when done.]
-
-Rules for steps:
-- Include EXACTLY 4 to 6 steps — never fewer than 4
-- Every step has a descriptive title followed by a colon
-- Every step is exactly 2 sentences — one for what to do, one for timing or visual cue
-- Steps must be in logical cooking order
+1. [Specific descriptive title]: [Clear instruction]
+2. [Specific descriptive title]: [Clear instruction]
+3. [Specific descriptive title]: [Clear instruction]
+(Continue for 4-6 steps. Use descriptive titles like "Toast Spices", "Simmer Sauce", never just "Step 1")
 
 Tips for Perfect {recipe_name}
 
-* [Tip label]: [One practical sentence about technique or common mistake to avoid.]
-* [Tip label]: [One practical sentence about ingredients or substitution.]
-* Serve with: [Specific traditional accompaniment from this dish's country.]
+* [Practical tip]
+* [Practical tip]
+* Serve with: [specific serving suggestion]
 
-TIP RULES:
-- Include exactly 3 tips
-- Every tip has a label followed by a colon
-- Last tip MUST start with "Serve with:"
+Let me know if you need any clarification on any step, or if you'd like to try something else!"""
 
-MANDATORY FINAL CHECK — verify before returning:
-[ ] Introduction section present with 2-3 sentences
-[ ] Essential Ingredients section present with * Category: format
-[ ] Step-by-Step Cooking Instructions present with 4-6 numbered titled steps
-[ ] Tips for Perfect {recipe_name} present with 3 tips
-If any section is missing — write it before returning.
-"""
-        
+        # --- BUILD USER PROMPT ---
+        if source_label == "PDF":
+            # PDF: Use ONLY the verified steps, no invention or expansion
+            user_prompt = f"""You are formatting a recipe from a verified African cookbook into this EXACT structure:
+
+[Introduction paragraph]
+
+Cuisine: [Country]
+
+Essential Ingredients
+
+* Starch: [ingredient with amount]
+* Protein: [ingredient with amount]
+* Aromatics: [ingredient with amount]
+* Vegetables: [ingredient with amount]
+* Spices: [ingredient with amount]
+* Fat: [ingredient with amount]
+* Optional: [ingredient with amount]
+
+Step-by-Step Cooking Instructions
+
+1. [Descriptive Title]: [Clear instruction]
+2. [Descriptive Title]: [Clear instruction]
+(Continue for all steps with descriptive titles like "Toast Spices", "Simmer Sauce", NOT "Step 1", "Step 2")
+
+Tips for Perfect {recipe_name}
+
+* [Practical tip]
+* [Practical tip]
+* Serve with: [serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!
+
+Recipe Name: {recipe_name}
+Cuisine Region: {cuisine_region or "East Africa"}
+Language: {language}
+
+{grounded_context}
+
+INSTRUCTIONS:
+- Use ONLY the ingredients and steps from the source above
+- DO NOT add, remove, or change any steps
+- DO NOT invent ingredients not in the source
+- Organize ingredients into the category structure
+- Use descriptive step titles (Toast Spices, Simmer Sauce, etc.) not generic "Step 1"
+- Keep the original instructions intact but format for clarity
+- Follow the exact format shown above"""
+
+        elif source_label == "TAVILY":
+            # Web: Expand into clear, actionable instructions
+            user_prompt = f"""You are formatting a recipe from a web search result into this EXACT structure:
+
+[Introduction paragraph]
+
+Cuisine: [Country]
+
+Essential Ingredients
+
+* Starch: [ingredient with amount]
+* Protein: [ingredient with amount]
+* Aromatics: [ingredient with amount]
+* Vegetables: [ingredient with amount]
+* Spices: [ingredient with amount]
+* Fat: [ingredient with amount]
+* Optional: [ingredient with amount]
+
+Step-by-Step Cooking Instructions
+
+1. [Descriptive Title]: [Clear instruction]
+2. [Descriptive Title]: [Clear instruction]
+(Continue for all steps with descriptive titles like "Toast Spices", "Simmer Sauce", NOT generic steps)
+
+Tips for Perfect {recipe_name}
+
+* [Practical tip]
+* [Practical tip]
+* Serve with: [serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!
+
+Recipe Name: {recipe_name}
+Cuisine Region: {cuisine_region or "East Africa"}
+Language: {language}
+
+{grounded_context}
+
+INSTRUCTIONS:
+- Use the ingredients and steps from the source above
+- You may expand vague steps into clearer, more detailed instructions
+- Organize ingredients into the category structure
+- Use descriptive step titles (Toast Spices, Simmer Sauce, etc.) not generic "Step 1"
+- Keep all original ingredients and steps but make instructions more actionable
+- Follow the exact format shown above"""
+
+        else:  # source_label == "GROQ"
+            # Generate: Create a complete authentic recipe from scratch
+            user_prompt = f"""Generate a complete authentic African recipe from scratch using this EXACT format:
+
+[Introduction paragraph - 2-3 sentences about the dish and its origin]
+
+Cuisine: {cuisine_region or "East Africa"}
+
+Essential Ingredients
+
+* Starch: [ingredient with amount]
+* Protein: [ingredient with amount]
+* Aromatics: [ingredient with amount]
+* Vegetables: [ingredient with amount]
+* Spices: [ingredient with amount]
+* Fat: [ingredient with amount]
+* Optional: [ingredient with amount]
+
+Step-by-Step Cooking Instructions
+
+1. [Descriptive Title]: [Clear instruction]
+2. [Descriptive Title]: [Clear instruction]
+3. [Descriptive Title]: [Clear instruction]
+(Continue for 4-6 steps with descriptive titles like "Toast Spices", "Simmer Sauce", "Add Vegetables" - NOT "Step 1", "Step 2")
+
+Tips for Perfect {recipe_name}
+
+* [Practical, authentic tip]
+* [Practical, authentic tip]
+* Serve with: [specific serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!
+
+Recipe: {recipe_name}
+Language: {language}
+
+Make it authentic, practical, and easy to follow. Use only real, chef-verified tips (no hallucinated tips). Include amounts for all ingredients."""
+
+        # --- CALL GROQ ---
         try:
             response = self.client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "You are an expert African cooking assistant generating detailed recipes."},
-                    {"role": "user", "content": prompt}
-                ],
                 model="llama-3.3-70b-versatile",
-                max_tokens=3000,
-                temperature=0.3
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000,
             )
-            
-            response_text = response.choices[0].message.content.strip()
-            parsed = self._parse_recipe(response_text, cuisine_region)
-            if not parsed.get("meal_name"):
-                parsed["meal_name"] = recipe_name
-            return parsed
-        
+            result = response.choices[0].message.content.strip()
+
+            # Append disclaimer if Groq generated freely (no verified source)
+            if source_label == "GROQ":
+                result += (
+                    "\n\n⚠️ Note: These steps are AI-generated as no verified source was found. "
+                    "We recommend cross-checking with a trusted recipe source."
+                )
+
+            return result
+
         except Exception as e:
-            print(f"LLM Error during recipe generation: {e}")
-            return {}
+            print(f"[generate_recipe] Groq call failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return ""
     
-    def _parse_recipe(self, text: str, cuisine_region: str = None) -> dict:
+    def _get_compound_intro(self, recipe_name: str, compound_recipe: dict) -> str:
+        """
+        Generate a brief introduction for a compound meal explaining
+        that it consists of multiple components.
+        """
+        components = compound_recipe.get("components", [])
+        if not components:
+            return ""
+
+        if len(components) == 2:
+            return (
+                f"{recipe_name.title()} is a complete East African meal "
+                f"consisting of two components: {components[0]} and {components[1]}. "
+                f"Both parts are prepared separately and served together "
+                f"for a satisfying and nutritious meal."
+            )
+        else:
+            parts = ", ".join(components[:-1]) + f" and {components[-1]}"
+            return (
+                f"{recipe_name.title()} is a complete meal consisting of: {parts}. "
+                f"Each component is prepared separately and served together."
+            )
+    
+    def _parse_recipe(self, text: str, cuisine_region: str = None, recipe_name: str = None) -> dict:
         """
         Parse structured recipe text returned by generate_recipe.
         Handles all section header variations Groq might return.
+        Filters out instruction text and removes all asterisks/dashes.
         """
+        # Filter out instruction lines that shouldn't appear in recipe output
+        filter_phrases = [
+            "use only these category",
+            "all of these ingredients",
+            "important: you must",
+            "every step must",
+            "category labels must",
+            "only include categories",
+            "skip empty categories"
+        ]
+        
+        lines_filtered = []
+        for line in text.split("\n"):
+            should_skip = any(phrase in line.lower() for phrase in filter_phrases)
+            if not should_skip:
+                lines_filtered.append(line)
+        
+        text = "\n".join(lines_filtered)
+        
         cuisine = cuisine_region or "East Africa"
         introduction = ""
         ingredients = []
@@ -623,13 +884,25 @@ If any section is missing — write it before returning.
                 continue
 
             # ── Section headers ─────────────────────────────────────────────────────
+            # Handle "Introduction" or "Intro" as section header
             if line_lower in ("introduction", "intro"):
+                if intro_lines:
+                    introduction = " ".join(intro_lines).strip()
+                    intro_lines = []
+                mode = "introduction"
+                continue
+            
+            # Handle "[Introduction: text...]" format (on same line)
+            if line_lower.startswith("[introduction:") or line_lower.startswith("introduction:"):
+                intro_text = line.split(":", 1)[1].strip().rstrip("]").strip()
+                if intro_text:
+                    introduction = intro_text
                 mode = "introduction"
                 continue
 
             if ("essential ingredients" in line_lower or
                     line_lower.strip() == "ingredients"):
-                if intro_lines:
+                if intro_lines and not introduction:
                     introduction = " ".join(intro_lines).strip()
                     intro_lines = []
                 mode = "ingredients"
@@ -642,7 +915,7 @@ If any section is missing — write it before returning.
                     line_lower.strip() in ("steps", "instructions", "method",
                                            "cooking instructions",
                                            "step-by-step cooking instructions")):
-                if intro_lines:
+                if intro_lines and not introduction:
                     introduction = " ".join(intro_lines).strip()
                     intro_lines = []
                 mode = "steps"
@@ -682,6 +955,8 @@ If any section is missing — write it before returning.
                 if line.startswith(("*", "-")):
                     ing = line.lstrip("*-").strip()
                     ing = re.sub(r'\*\*', '', ing).strip()
+                    # Remove asterisks completely
+                    ing = ing.replace("*", "").strip()
                     if ing and len(ing) > 2:
                         ingredients.append(ing)
                 continue
@@ -694,7 +969,10 @@ If any section is missing — write it before returning.
                     cleaned = re.sub(r'^\d+[\.\)]\s*', '', line).strip()
                     cleaned = re.sub(r'^step\s*\d+[\.\):]*\s*', '', cleaned,
                                      flags=re.IGNORECASE).strip()
+                    # Remove markdown bold/asterisks
                     cleaned = re.sub(r'\*\*', '', cleaned).strip()
+                    # Remove trailing instruction text in parentheses (IMPORTANT:, Note:, etc.)
+                    cleaned = re.sub(r'\s*[\(\[]?(IMPORTANT|NOTE|Note|Important):[^\)]*[\)\]]?\s*$', '', cleaned, flags=re.IGNORECASE).strip()
                     if cleaned and len(cleaned) > 5:
                         steps.append(cleaned)
                 elif steps and line and not line.startswith(("*", "-")):
@@ -709,23 +987,46 @@ If any section is missing — write it before returning.
                 if line.startswith(("*", "-")):
                     tip = line.lstrip("*-").strip()
                     tip = re.sub(r'\*\*', '', tip).strip()
+                    tip = tip.replace("*", "").strip()
                     if tip and len(tip) > 2:
                         tips.append(tip)
                 elif tips and line:
-                    tips[-1] = tips[-1] + " " + line
+                    continuation = line.replace("*", "").strip()
+                    if continuation:
+                        tips[-1] = tips[-1] + " " + continuation
                 continue
 
         # Finalize introduction
         if intro_lines and not introduction:
             introduction = " ".join(intro_lines).strip()
+        
+        # Final cleanup: remove all asterisks from all fields and filter empty ingredients
+        def clean_text(text):
+            """Remove all asterisks and clean content."""
+            if not text:
+                return text
+            text = text.replace("*", "").strip()
+            return text
+        
+        # Clean ingredients: remove asterisks and filter empty category-only lines
+        cleaned_ingredients = []
+        for ing in ingredients:
+            cleaned = clean_text(ing)
+            # Don't include lines that are just category labels with no content
+            if cleaned and not cleaned.endswith(":") and len(cleaned) > 2:
+                cleaned_ingredients.append(cleaned)
+        
+        cleaned_steps = [clean_text(step) for step in steps]
+        cleaned_tips = [clean_text(tip) for tip in tips]
+        cleaned_intro = clean_text(introduction)
 
         return {
-            "meal_name":      "",
+            "meal_name":      recipe_name or "",
             "cuisine":        cuisine,
             "cuisine_region": cuisine,
-            "introduction":   introduction,
-            "ingredients":    ingredients,
-            "steps":          steps[:6],
-            "tips":           tips,
+            "introduction":   cleaned_intro,
+            "ingredients":    cleaned_ingredients,
+            "steps":          cleaned_steps[:6],
+            "tips":           cleaned_tips,
         }
         

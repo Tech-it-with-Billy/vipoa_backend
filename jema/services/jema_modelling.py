@@ -121,8 +121,8 @@ EAST_AFRICAN_RECIPE_LIBRARY = [
     },
     {
         "name": "Pilau",
-        "core": ["rice", "beef", "onions"],
-        "ingredients": ["rice", "beef", "onions", "pilau masala", "spices"],
+        "core": ["rice", "onions", "pilau masala"],
+        "ingredients": ["rice", "onions", "pilau masala", "spices", "oil"],
         "region": "east_africa",
         "cook_time": 45
     },

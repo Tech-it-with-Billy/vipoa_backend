@@ -6,6 +6,7 @@ This is the only class that API views should call.
 
 import os
 import re
+import random
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -27,17 +28,18 @@ from jema.src.language_detector import LanguageDetector
 from jema.services.llm_service import LLMService
 
 
-# Common East African recipes fallback (when not in database)
+# Common African recipes fallback (when not in database) - diverse cuisines from across Africa
 COMMON_RECIPES = {
+    # East African
     "Beef Stew with Rice": {
         "ingredients": ["rice", "beef", "onion", "tomato", "garlic", "oil", "spices"],
         "country": "East Africa",
         "description": "Hearty beef stew served with fluffy rice"
     },
     "Pilau": {
-        "ingredients": ["rice", "onion", "tomato", "beef", "spices"],
+        "ingredients": ["rice", "onion", "spices", "oil"],
         "country": "Kenya/Tanzania",
-        "description": "Spiced rice dish cooked with meat and aromatic spices"
+        "description": "Fragrant spiced rice dish cooked with aromatics, onions, and pilau masala. Can be made with or without meat."
     },
     "Biryani": {
         "ingredients": ["rice", "onion", "tomato", "chicken", "yogurt", "spices"],
@@ -63,6 +65,50 @@ COMMON_RECIPES = {
         "ingredients": ["maize flour", "water"],
         "country": "Kenya/Tanzania/Uganda",
         "description": "Staple cornmeal dish, firm and filling"
+    },
+    # West African
+    "Jollof Rice": {
+        "ingredients": ["rice", "tomato", "onion", "pepper", "chicken", "oil", "spices"],
+        "country": "Nigeria/Ghana",
+        "description": "Vibrant red rice dish cooked in tomato and spices"
+    },
+    "Fufu": {
+        "ingredients": ["plantain", "yam", "cassava", "salt", "water"],
+        "country": "West Africa",
+        "description": "Pounded starchy root vegetable, served with soups"
+    },
+    "Peanut Butter Stew": {
+        "ingredients": ["peanut butter", "chicken", "tomato", "onion", "vegetable", "water"],
+        "country": "West Africa",
+        "description": "Rich creamy stew with meat and vegetables"
+    },
+    # Southern African
+    "Sadza": {
+        "ingredients": ["maize meal", "water", "salt"],
+        "country": "Zimbabwe/Botswana",
+        "description": "Thick cornmeal porridge, staple food from Southern Africa"
+    },
+    "Pap and Relish": {
+        "ingredients": ["maize meal", "water", "tomato", "onion", "vegetables"],
+        "country": "South Africa",
+        "description": "Creamy maize porridge with vegetable accompaniment"
+    },
+    # North African
+    "Tagine": {
+        "ingredients": ["lamb", "apricot", "onion", "cinnamon", "ginger", "oil", "water"],
+        "country": "Morocco",
+        "description": "Slow-cooked aromatic stew with meat and fruits"
+    },
+    "Couscous": {
+        "ingredients": ["couscous", "vegetable", "broth", "chickpea", "spice"],
+        "country": "North Africa",
+        "description": "Light fluffy grain dish served with stews and vegetables"
+    },
+    # Central African
+    "Cassava Leaves Stew": {
+        "ingredients": ["cassava leaves", "groundnut", "onion", "garlic", "water", "oil"],
+        "country": "Central Africa",
+        "description": "Nutritious green leafy stew with peanut sauce"
     }
 }
 
@@ -101,6 +147,69 @@ class JemaEngine:
         """Normalize recipe name to canonical form to prevent duplicates."""
         return self.RECIPE_NAME_ALIASES.get(name.lower().strip(), name.lower().strip())
 
+    def _get_recipe_region(self, recipe: Dict) -> str:
+        """Extract the region/country from a recipe dict."""
+        # Try multiple field names
+        region = recipe.get("cuisine_region") or recipe.get("country") or recipe.get("region") or ""
+        return str(region).strip()
+
+    def _is_region_overdone(self, region: str, max_repeats: int = 1) -> bool:
+        """
+        Check if a region has been suggested too many times recently.
+        Prevents repetition from same region in current session.
+        
+        Returns True if region should be avoided.
+        """
+        if not region:
+            return False
+        region_lower = region.lower()
+        count = sum(1 for r in self.suggested_regions if r.lower() == region_lower)
+        return count >= max_repeats
+
+    def _select_diverse_recipes(
+        self, 
+        candidate_recipes: List[Dict], 
+        num_to_select: int = 3,
+        prefer_new_regions: bool = True
+    ) -> List[Dict]:
+        """
+        Intelligently select recipes with regional diversity.
+        
+        Args:
+            candidate_recipes: List of candidate recipes to select from
+            num_to_select: How many recipes to return (typically 3)
+            prefer_new_regions: If True, avoid regions already suggested
+            
+        Returns:
+            List of selected recipes, prioritizing regional diversity
+        """
+        if len(candidate_recipes) <= num_to_select:
+            return candidate_recipes
+        
+        if not prefer_new_regions:
+            # Just randomly select
+            return random.sample(candidate_recipes, num_to_select)
+        
+        # Sort by region freshness: recipes from unseen regions first
+        def region_score(recipe):
+            region = self._get_recipe_region(recipe)
+            is_overdone = self._is_region_overdone(region)
+            # Return negative so overdone regions sort last
+            return 0 if not is_overdone else -1
+        
+        sorted_recipes = sorted(candidate_recipes, key=region_score, reverse=True)
+        
+        # If we have enough recipes from diverse regions, use them
+        selected = sorted_recipes[:num_to_select]
+        
+        # Track the regions of selected recipes
+        for recipe in selected:
+            region = self._get_recipe_region(recipe)
+            if region:
+                self.suggested_regions.append(region)
+        
+        return selected
+
     def __init__(self, excel_path: Optional[str] = None, debug_mode: bool = False):
         """
         Initialize the Jema Engine.
@@ -138,6 +247,9 @@ class JemaEngine:
         self.recipe_confirmed: bool = False
         self.awaiting_recipe_choice: bool = False
         self.debug_mode: bool = debug_mode
+        
+        # Regional diversity tracking (prevent repetition from same region)
+        self.suggested_regions: List[str] = []  # Track regions of suggested recipes in this session
 
     def process_message(self, user_input: str) -> Dict:
         """
@@ -218,6 +330,7 @@ class JemaEngine:
         self.current_recipe = None
         self.recipe_confirmed = False
         self.awaiting_recipe_choice = False
+        self.suggested_regions = []  # Reset regional tracking
         
         message = "Conversation cleared. Let's start fresh!"
         self.llm.add_to_history("user", "reset")
@@ -258,7 +371,7 @@ class JemaEngine:
             
             return self._build_response(message, recipe_list)
         else:
-            message = f"I don't have specific recipes from the {community.title()} community in my database yet.\n\nBut I can help you with other East African dishes. What ingredients do you have?"
+            message = f"I don't have specific recipes from the {community.title()} community in my database yet.\n\nBut I can help you with many African dishes from across the continent. What ingredients do you have?"
             self.llm.add_to_history("user", user_input)
             self.llm.add_to_history("assistant", message)
             
@@ -415,7 +528,7 @@ class JemaEngine:
             meal_time = "dinner"
         
         time_context = f" for {meal_time}" if meal_time else ""
-        prompt = f"Suggest 3-4 delicious traditional East African recipes{time_context}. Include the dish name and a brief description of why it's great. Keep it conversational and appetizing."
+        prompt = f"Suggest 3-4 delicious traditional African recipes{time_context} from across the continent. Include the dish name and a brief description of why it's great. Keep it conversational and appetizing."
         
         response = self.llm.general_response(prompt, use_history=False, include_cta=False)
         self.llm.add_to_history("user", user_input)
@@ -425,6 +538,12 @@ class JemaEngine:
 
     def _handle_information(self, user_input: str) -> Dict:
         """Handle information/social chat."""
+        # Check if this might be a recipe request that wasn't caught by RECIPE_REQUEST intent
+        recipe_name = self._extract_recipe_name(user_input)
+        if recipe_name:
+            # Route to recipe handler
+            return self._handle_recipe_request(user_input)
+        
         response = self.llm.general_response(user_input, use_history=True, include_cta=False)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
@@ -490,8 +609,7 @@ class JemaEngine:
         - "Give me a recipe for chapati"
         - "How to make ugali"
 
-        Always uses generate_recipe — never uses general_response for recipe requests.
-        Produces the same rich format as recipe selection.
+        Always uses generate_recipe() which returns a fully formatted recipe string.
         """
         # Extract recipe name from the request
         recipe_name = self._extract_recipe_name(user_input)
@@ -513,20 +631,46 @@ class JemaEngine:
             )
             return self._build_response(response, [])
 
-        # Use _display_full_recipe which calls generate_recipe and enriches with Groq
-        recipe_data = {
-            "meal_name":      recipe_name,
-            "cuisine_region": "East Africa",
-            "ingredients":    [],
-            "steps":          [],
-            "introduction":   "",
-            "tips":           [],
-        }
-
-        return self._display_full_recipe(recipe_data, user_input)
+        # Generate full formatted recipe using Groq
+        try:
+            message = self.llm.generate_recipe(recipe_name, cuisine_region="East Africa")
+            
+            if message:
+                # Add closing statement and update history
+                message += "\n\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
+                
+                # Store recipe data for context
+                recipe_data = {
+                    "meal_name": recipe_name,
+                    "cuisine_region": "East Africa",
+                    "source": "pdf/web/groq",
+                }
+                
+                self.current_recipe = recipe_data
+                self.recipe_confirmed = True
+                self.last_suggested_recipes = [recipe_data]
+                self.awaiting_recipe_choice = False
+                
+                self.llm.add_to_history("user", user_input)
+                self.llm.add_to_history("assistant", message)
+                
+                return self._build_response(message, [recipe_data])
+            else:
+                # Fallback if recipe generation failed
+                response = self.llm.general_response(
+                    user_input, use_history=True, include_cta=True
+                )
+                return self._build_response(response, [])
+        
+        except Exception as e:
+            print(f"[Recipe Request Error] {e}")
+            response = self.llm.general_response(
+                user_input, use_history=True, include_cta=True
+            )
+            return self._build_response(response, [])
 
     def _handle_ingredient_based(self, user_input: str, constraints: List) -> Dict:
-        """Handle ingredient-based recipe matching with East African focus and deduplication."""
+        """Handle ingredient-based recipe matching across African cuisines with deduplication."""
         # Extract ingredients
         user_ingredients = IngredientNormalizer.extract_from_string(user_input)
         
@@ -564,11 +708,6 @@ class JemaEngine:
         # Normalize ingredients for matching
         normalized_ingredients = [ing.lower().strip() for ing in user_ingredients]
         
-        # Debug: Show what ingredients normalizer is doing
-        if self.debug_mode:
-            print(f"[INGREDIENT DEBUG] Raw input     : {user_ingredients}")
-            print(f"[INGREDIENT DEBUG] After normalize: {normalized_ingredients}")
-        
         # Get raw CSV results — convert to dicts immediately
         raw_csv_results = []
         for match in matches:
@@ -585,15 +724,9 @@ class JemaEngine:
                     "country": str(row.get("country", "") if hasattr(row, 'get') else ""),
                 })
         
-        # ── STEP 1: Filter CSV results to East Africa only ──────────────────────────
-        ea_keywords = {"east", "africa", "kenya", "tanzania", "uganda", "rwanda", "burundi", "somalia"}
-        ea_results = [
-            r for r in raw_csv_results
-            if any(
-                kw in str(r.get("cuisine_region", "") or r.get("country", "")).lower()
-                for kw in ea_keywords
-            )
-        ]
+        # ── STEP 1: Include all African recipes from CSV (no regional filtering) ──────────────────────────
+        # All African cuisines are welcome, so we use all results
+        ea_results = raw_csv_results
 
         # ── STEP 2: Score CSV results by primary ingredient relevance ────────────────
         # A recipe only qualifies if:
@@ -652,11 +785,6 @@ class JemaEngine:
                 if ing in PRIMARY_INGREDIENTS
             )
 
-            if self.debug_mode:
-                print(f"[CSV FILTER] {recipe.get('meal_name', '')} | "
-                      f"matched={matched} | missing={missing} | "
-                      f"all_present={all_present} | primary={primary_matched}")
-
             return match_count, all_present and primary_matched
 
         strong_csv = []
@@ -668,13 +796,6 @@ class JemaEngine:
         # Sort by match count descending — most ingredient matches first
         strong_csv.sort(key=lambda x: x[0], reverse=True)
         csv_results = [recipe for _, recipe in strong_csv][:3]
-
-        if self.debug_mode:
-            print(f"[CSV DEBUG] Strong matches after ALL-ingredient filter: "
-                  f"{[r.get('meal_name') for r in csv_results]}")
-            if not csv_results:
-                print(f"[CSV DEBUG] No CSV recipe matched ALL ingredients: {normalized_set}")
-                print(f"[CSV DEBUG] Groq will fill all 3 slots")
 
         # Build seen names from CSV results
         seen_names = {
@@ -688,15 +809,12 @@ class JemaEngine:
 
         if groq_needed > 0:
             try:
-                groq_recipes = self.llm.generate_east_african_recipe_from_ingredients(
+                groq_recipes = self.llm.generate_african_recipe_from_ingredients(
                     user_ingredients=normalized_ingredients,
                     exclude_names=list(seen_names),
                     count=groq_needed,
                     language=self.llm.current_language
                 )
-                if self.debug_mode:
-                    print(f"[GROQ DEBUG] Groq filled {len(groq_recipes)} slots: "
-                          f"{[r.get('meal_name') for r in groq_recipes]}")
             except Exception as e:
                 print(f"Groq gap-fill error: {e}")
                 groq_recipes = []
@@ -768,6 +886,17 @@ class JemaEngine:
                             all_recipes.append(default)
                             existing_names.add(name_key)
                     break
+
+        # Apply regional diversity to final recipe selection
+        # This ensures we don't repeat recipes from the same region
+        if len(all_recipes) >= 3:
+            all_recipes = self._select_diverse_recipes(all_recipes, num_to_select=3, prefer_new_regions=True)
+        else:
+            # Track regions even if we have fewer than 3 recipes
+            for recipe in all_recipes:
+                region = self._get_recipe_region(recipe)
+                if region:
+                    self.suggested_regions.append(region)
 
         # Store full recipes in session state
         self.last_suggested_recipes = all_recipes
@@ -887,6 +1016,12 @@ class JemaEngine:
 
     def _handle_fallback(self, user_input: str) -> Dict:
         """Handle unrecognized intents."""
+        # Check if this might be a recipe request
+        recipe_name = self._extract_recipe_name(user_input)
+        if recipe_name:
+            # Route to recipe handler
+            return self._handle_recipe_request(user_input)
+        
         response = self.llm.general_response(user_input, use_history=True, include_cta=False)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
@@ -958,57 +1093,83 @@ class JemaEngine:
             message = output
         else:
             # Try to generate a rich recipe using the new generate_recipe method for CSV recipes
-            rich_recipe = None
             if self.llm.client is not None:
                 rich_recipe = self.llm.generate_recipe(recipe_name, country)
-            
-            # If we got a rich recipe from LLM, use it
-            if rich_recipe and rich_recipe.get('ingredients') and rich_recipe.get('steps'):
-                output = f"\nGreat! Here's the recipe for {recipe_name}\n"
-                
-                # Add introduction if available
-                if rich_recipe.get('introduction'):
-                    output += f"\n{rich_recipe['introduction']}\n"
-                
-                # Add cuisine
-                cuisine = rich_recipe.get('cuisine', country or 'East Africa')
-                output += f"\nCuisine: {cuisine}\n"
-                
-                # Add ingredients
-                output += "\nEssential Ingredients\n\n"
-                for ing in rich_recipe.get('ingredients', []):
-                    ing = ing.strip()
-                    # Remove any existing bullet formatting
-                    ing = ing.lstrip('* -').strip()
-                    # Skip empty category lines
-                    parts = ing.split(":", 1)
-                    if len(parts) == 2 and not parts[1].strip():
-                        continue
-                    output += ing + "\n"
-                
-                # Add steps
-                output += "\nStep-by-Step Cooking Instructions\n\n"
-                for i, step in enumerate(rich_recipe.get('steps', [])[:6], 1):
-                    step = step.strip()
-                    if ':' in step:
-                        output += f"{i}. {step}\n"
+                if rich_recipe:
+                    # generate_recipe() now returns a fully formatted string
+                    message = rich_recipe
+                else:
+                    # Fallback to original format if LLM generation failed or unavailable
+                    # Handle both CSV format (core_ingredients, recipes) and Groq format (ingredients, steps)
+                    if isinstance(recipe_data.get('ingredients'), list):
+                        # Groq format: ingredients and steps are already lists
+                        ingredients_list = recipe_data.get('ingredients', [])
+                        steps_list = recipe_data.get('steps', [])
                     else:
-                        if not step.endswith((".", "!", "?")):
-                            step += "."
-                        output += f"{i}. {step}\n"
-                
-                # Add tips
-                if rich_recipe.get('tips'):
-                    output += f"\nTips for Perfect {recipe_name}\n\n"
-                    for tip in rich_recipe['tips']:
-                        tip = tip.strip()
-                        # Remove any existing bullet formatting
-                        tip = tip.lstrip('* -').strip()
-                        output += tip + "\n"
-                
-                message = output
+                        # CSV format: core_ingredients and recipes are strings
+                        ingredients = recipe_data.get('core_ingredients', '')
+                        steps = recipe_data.get('recipes', '')
+                        
+                        # Parse CSV strings into lists
+                        if pd.notna(ingredients) and ingredients:
+                            safe_ingredients = ingredients.replace('→', '->').replace('•', '-').replace('✓', '*')
+                            ingredients_list = [ing.strip() for ing in safe_ingredients.split(',') if ing.strip()]
+                        else:
+                            ingredients_list = []
+                        
+                        if pd.notna(steps) and steps:
+                            safe_steps = steps.replace('→', '->').replace('•', '-').replace('✓', '*')
+                            safe_steps = safe_steps.replace('Method: Fry', '').replace('Method: Stew', '').replace('Method: Boil', '')
+                            safe_steps = safe_steps.replace('Steps: ', '').replace('Time: ', '')
+                            safe_steps = safe_steps.replace('30–40 min', '').replace('35–45 min', '').replace('45–60 min', '').replace('20–30 min', '')
+                            
+                            step_candidates = re.split(r'[\n\.]+', safe_steps)
+                            steps_list = [step.strip() for step in step_candidates if step.strip()]
+                        else:
+                            steps_list = []
+                    
+                    recipe_msg = []
+                    
+                    # Relate user's ingredients if provided
+                    if user_ingredients and ingredients_list:
+                        recipe_ing_list = [s.strip() for s in ingredients_list if s.strip()]
+                        recipe_ing_set = IngredientNormalizer.normalize_list(recipe_ing_list)
+                        have = sorted(list(recipe_ing_set.intersection(user_ingredients)))
+                        missing = [
+                            ing for ing in recipe_ing_set 
+                            if ing not in user_ingredients and not IngredientNormalizer.is_assumed_ingredient(ing)
+                        ]
+                        if have:
+                            recipe_msg.append(f"Based on what you have ({', '.join(have)}), here's an easy recipe:")
+                        if missing:
+                            recipe_msg.append(f"(You may need: {', '.join(missing)})")
+                    
+                    # Header
+                    recipe_msg.append(f"\nGreat! Here's the recipe for {recipe_name}")
+                    if country:
+                        recipe_msg.append(f"From: {country}")
+                    
+                    cook_time = recipe_data.get('cook_time', '')
+                    if pd.notna(cook_time) and cook_time:
+                        recipe_msg.append(f"Time: {cook_time} minutes")
+                    
+                    # Ingredients
+                    if ingredients_list:
+                        recipe_msg.append("\nEssential Ingredients")
+                        for ing in ingredients_list:
+                            if not ing.startswith("*"):
+                                ing = "* " + ing
+                            recipe_msg.append(ing)
+                    
+                    # Steps
+                    if steps_list:
+                        recipe_msg.append("\nStep-by-Step Cooking Instructions")
+                        for i, step in enumerate(steps_list[:6], 1):
+                            recipe_msg.append(f"{i}. {step}")
+                    
+                    message = "\n".join(recipe_msg)
             else:
-                # Fallback to original format if LLM generation failed or unavailable
+                # Fallback to original format if LLM client not available
                 # Handle both CSV format (core_ingredients, recipes) and Groq format (ingredients, steps)
                 if isinstance(recipe_data.get('ingredients'), list):
                     # Groq format: ingredients and steps are already lists
@@ -1079,25 +1240,6 @@ class JemaEngine:
                 message = "\n".join(recipe_msg)
         
         message += "\n\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
-        
-        # If steps are still empty after enrichment, retry generate_recipe
-        steps = recipe_data.get("steps", [])
-        if not steps and recipe_name:
-            try:
-                if self.debug_mode:
-                    print(f"[DEBUG] Steps missing for {recipe_name} — retrying generate_recipe")
-                cuisine_region = recipe_data.get("cuisine_region", recipe_data.get("country", "East Africa"))
-                retry_dict = self.llm.generate_recipe(
-                    recipe_name=recipe_name,
-                    cuisine_region=cuisine_region
-                )
-                if retry_dict and retry_dict.get("steps"):
-                    steps = retry_dict.get("steps", [])
-                    ingredients = retry_dict.get("ingredients", []) or ingredients
-                    tips = retry_dict.get("tips", []) or tips
-                    introduction = retry_dict.get("introduction", "") or introduction
-            except Exception as e:
-                print(f"Retry generate_recipe error: {e}")
         
         # Lock in recipe
         self.current_recipe = recipe_data
@@ -1291,13 +1433,6 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
         normalized_user = [ing.lower().strip() for ing in user_ingredients]
         primary_user = [ing for ing in normalized_user if ing in PRIMARY_INGREDIENTS]
 
-        print("\n" + "=" * 60)
-        print(f"🔍 GROQ ACCURACY DEBUG ({source.upper()})")
-        print("=" * 60)
-        print(f"User ingredients   : {', '.join(normalized_user)}")
-        print(f"Primary ingredients: {', '.join(primary_user) if primary_user else 'none detected'}")
-        print("-" * 60)
-
         total_score = 0
 
         for i, recipe in enumerate(suggested_recipes, 1):
@@ -1338,43 +1473,6 @@ Format as plain text, no markdown. Be specific with measurements and timing."""
                 accuracy -= 40
             accuracy = max(0, min(100, accuracy))
             total_score += accuracy
-
-            # Status
-            if accuracy >= 80:
-                status = "✅ RELEVANT"
-            elif accuracy >= 50:
-                status = "⚠️  PARTIAL"
-            else:
-                status = "❌ IRRELEVANT"
-
-            print(f"\nRecipe {i}: {meal_name} ({cuisine})")
-            print(f"  Status             : {status} ({accuracy:.0f}%)")
-            print(f"  East African       : {'Yes' if is_east_african else 'No — broader African'}")
-            print(f"  Matched ingredients: {', '.join(matched) if matched else 'none'}")
-            print(f"  Missing ingredients: {', '.join(missing) if missing else 'none'}")
-            print(f"  Primary ingredient : {'✅ present' if primary_present else '❌ MISSING'}")
-
-            if accuracy < 80:
-                print(f"  ⚠️  WHY WRONG:")
-                if not primary_present and primary_user:
-                    print(f"     → {meal_name} does not use {', '.join(primary_user)} as a main component")
-                    print(f"     → Matched on {', '.join(matched) if matched else 'nothing'} only")
-                if missing:
-                    print(f"     → These ingredients are absent: {', '.join(missing)}")
-
-        overall = total_score / len(suggested_recipes) if suggested_recipes else 0
-        print("\n" + "-" * 60)
-        print(f"Overall accuracy: {overall:.0f}%")
-
-        if overall < 70:
-            print("⚠️  LOW ACCURACY — Groq is ignoring primary ingredients")
-            print("   Most likely cause: CSV fallback is overriding Groq results")
-            print("   or primary ingredient not in PRIMARY_INGREDIENTS set")
-            print("   Fix: ensure groq_needed > 0 when primary ingredient missing from CSV")
-        else:
-            print("✅ Recommendations are relevant")
-
-        print("=" * 60 + "\n")
 
     def get_state(self) -> Dict:
         """Get current conversation state (for debugging/persistence)."""
