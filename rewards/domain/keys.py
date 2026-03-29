@@ -20,3 +20,6 @@ def streak_daily_key(user_id: int, day: date) -> str:
 
 def streak_weekly_key(user_id: int, year: int, week: int) -> str:
     return f"STREAK_WEEKLY:{user_id}:{year:04d}-W{week:02d}"
+
+def referral_milestone_key(user_id: int, milestone: int) -> str:
+    return f"REFERRAL_MILESTONE:{user_id}:{milestone}"

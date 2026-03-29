@@ -1,9 +1,12 @@
 from rest_framework import serializers
-from .models import Profile
+from .models import Profile, Referral
 from .constants import PROFILE_COMPLETION_FIELDS
 from rewards.services.events import award_profile_completion
 
 
+# -----------------------------
+# Profile Serializers
+# -----------------------------
 class ProfileReadSerializer(serializers.ModelSerializer):
     age = serializers.SerializerMethodField()
     bmi = serializers.SerializerMethodField()
@@ -11,6 +14,7 @@ class ProfileReadSerializer(serializers.ModelSerializer):
     tdee = serializers.SerializerMethodField()
     poa_points = serializers.SerializerMethodField()
     profile_completed_awarded = serializers.BooleanField(read_only=True)
+    referral_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = Profile
@@ -40,6 +44,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             "day_streak",
             "profile_completed_awarded",
             "updated_at",
+            "referral_code",
         ]
 
     def update(self, instance, validated_data):
@@ -55,3 +60,30 @@ class ProfileCompletionStatusSerializer(serializers.Serializer):
     is_complete = serializers.BooleanField()
     missing_fields = serializers.ListField(child=serializers.CharField())
     completion_percentage = serializers.FloatField()
+
+
+# -----------------------------
+# Referral Serializers
+# -----------------------------
+class ReferralSerializer(serializers.ModelSerializer):
+    referrer_email = serializers.CharField(source="referrer.email", read_only=True)
+    referred_email = serializers.CharField(source="referred_user.email", read_only=True)
+
+    class Meta:
+        model = Referral
+        fields = ["id", "referrer_email", "referred_email", "created_at"]
+
+
+class ReferralCountSerializer(serializers.Serializer):
+    referral_count = serializers.SerializerMethodField()
+
+    def get_referral_count(self, obj):
+        return Referral.objects.filter(referrer=obj.user).count()
+
+
+class ReferralLeaderboardSerializer(serializers.ModelSerializer):
+    referral_count = serializers.IntegerField()
+
+    class Meta:
+        model = Profile
+        fields = ["user", "name", "referral_count"]

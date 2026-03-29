@@ -1,4 +1,5 @@
 import uuid
+import secrets
 from datetime import date
 
 from django.conf import settings
@@ -115,7 +116,17 @@ class Profile(models.Model):
     day_streak = models.IntegerField(default=0)
     profile_completed_awarded = models.BooleanField(default=False)
 
+    # -----------------------------
+    # REFERRAL
+    # -----------------------------
+    referral_code = models.CharField(max_length=12, unique=True, blank=True)
+
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.referral_code:
+            self.referral_code = secrets.token_hex(6).upper()
+        super().save(*args, **kwargs)
 
     # -----------------------------
     # WALLET BALANCE
@@ -210,3 +221,20 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"Profile(user_id={self.user_id})"
+
+
+class Referral(models.Model):
+    referrer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="referrals_made"
+    )
+    referred_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="referrals_received"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("referrer", "referred_user")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Referral(referrer={self.referrer.email}, referred={self.referred_user.email})"
