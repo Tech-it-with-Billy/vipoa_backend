@@ -165,9 +165,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.vipoa.africa",
     "http://localhost:5173",
     "https://vipoa.netlify.app",
-    "https://download.vipoa.africa",
+    "https://app.vipoa.africa",
     "https://vipoa.pages.dev",
-    "https://vipoaafrica.netlify.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
