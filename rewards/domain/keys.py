@@ -23,3 +23,6 @@ def streak_weekly_key(user_id: int, year: int, week: int) -> str:
 
 def referral_milestone_key(user_id: int, milestone: int) -> str:
     return f"REFERRAL_MILESTONE:{user_id}:{milestone}"
+
+def first_jema_interaction_key(user_id: int) -> str:
+    return f"FIRST_JEMA_INTERACTION:{user_id}"
