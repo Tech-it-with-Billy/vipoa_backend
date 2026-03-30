@@ -79,7 +79,7 @@ class ReferralCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        referral_code = request.data.get("referral_code")
+        referral_code = (request.data.get("referral_code") or "").strip().upper()
         if not referral_code:
             return Response({"error": "Referral code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
