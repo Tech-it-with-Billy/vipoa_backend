@@ -1,10 +1,12 @@
 # jema/signals.py
 import logging
+import uuid
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.core.exceptions import ValidationError
 from jema.models import ChatMessage
 from rewards.services.events import award_jema_first_interaction
 
@@ -39,6 +41,9 @@ def award_jema_first_message(sender, instance: ChatMessage, created: bool, **kwa
         user = User.objects.get(id=session.user_id)
     except User.DoesNotExist:
         logger.warning("jema.reward_user_not_found session_id=%s user_id=%s", session.id, session.user_id)
+        return
+    except (ValueError, TypeError, ValidationError):
+        logger.warning("jema.reward_invalid_user_id session_id=%s user_id=%s", session.id, session.user_id)
         return
 
     # -----------------------------
