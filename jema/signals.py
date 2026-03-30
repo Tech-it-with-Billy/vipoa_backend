@@ -8,44 +8,27 @@ from django.conf import settings
 @receiver(post_save, sender=ChatMessage)
 def award_first_jema_interaction(sender, instance: ChatMessage, created: bool, **kwargs):
     """
-    Trigger reward for first Jema interaction.
-
-    Works with:
-    - ChatSession.user_id (Supabase UUID string)
-    - SupabaseUser.id (UUID primary key)
-
-    No DB schema changes required.
+    Awards 50 points to a user the first time they interact with Jema.
+    Only triggers if:
+      - message role is 'user'
+      - the user exists
+      - the user has no previous ChatMessage records
     """
     if not created:
-        return
-
-    if instance.role != "user":
-        return
+        return  # only process newly created messages
 
     session = instance.session
-    if not session.user_id:
-        return
+    user = session.user  # points to real user
 
-    # -----------------------------
-    # Map Supabase sub -> Django user
-    # -----------------------------
-    try:
-        user = User.objects.get(id=session.user_id)
-    except User.DoesNotExist:
-        return
+    if not user:
+        return  # skip if anonymous session
 
-    # -----------------------------
-    # Check if this is first message
-    # -----------------------------
+    # Only award if this is the first user message
     previous_messages_exist = ChatMessage.objects.filter(
-        session__user_id=session.user_id,
-        role="user"
+        session__user=user,
+        role='user'
     ).exclude(id=instance.id).exists()
 
-    if previous_messages_exist:
-        return
-
-    # -----------------------------
-    # Delegate to rewards app
-    # -----------------------------
-    award_first_jema_interaction(user=user)
+    if not previous_messages_exist:
+        # award points via rewards app
+        award_jema_first_interaction(user=user)

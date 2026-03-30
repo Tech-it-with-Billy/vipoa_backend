@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from jema.models import ChatSession, ChatMessage
 from jema.serializers import ChatSessionSerializer, ChatMessageSerializer
 from jema.services.jema_engine import JemaEngine
+from profiles.jema_profile_service import get_user_profile_context
 from jema.services.jema_modelling import (
     run_jema_model,
     answer_with_rag,
@@ -132,8 +133,11 @@ def chat(request):
             # No session, use global engine
             engine = get_engine()
         
+        # Get user profile context for personalisation
+        user_profile = get_user_profile_context(request.user) if request.user.is_authenticated else {}
+        
         # Process message
-        response = engine.process_message(user_message)
+        response = engine.process_message(user_message, user_profile=user_profile)
         
         # Optionally persist to database
         if session_id:
