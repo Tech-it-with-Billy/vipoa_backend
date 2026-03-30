@@ -1,13 +1,19 @@
-from django.db import models
+from django.conf import settings
 
 class ChatSession(models.Model):
     """Stores chat sessions for a user."""
-    user_id = models.CharField(max_length=255, blank=True, null=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_sessions",
+        null=True,  # optional if anonymous sessions are allowed
+        blank=True
+    )
     session_started = models.DateTimeField(auto_now_add=True)
     session_ended = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return f"Session {self.id} - User {self.user_id}"
+        return f"Session {self.id} - User {self.user.email if self.user else 'Anonymous'}"
 
 class ChatMessage(models.Model):
     """Stores individual messages in a chat session."""
