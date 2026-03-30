@@ -251,13 +251,12 @@ class JemaEngine:
         # Regional diversity tracking (prevent repetition from same region)
         self.suggested_regions: List[str] = []  # Track regions of suggested recipes in this session
 
-    def process_message(self, user_input: str, user_profile: dict = None) -> Dict:
+    def process_message(self, user_input: str) -> Dict:
         """
         Process a user message and return a response.
         
         Args:
             user_input: User's natural language input
-            user_profile: Optional dict from profiles.jema_profile_service.get_user_profile_context()
         
         Returns:
             Dictionary with:
@@ -267,9 +266,6 @@ class JemaEngine:
                 - cta: str (call-to-action message)
                 - state: Dict (current conversation state for debugging)
         """
-        # Store on instance — accessible by all handler methods
-        self.user_profile = user_profile or {}
-        
         user_input = user_input.strip()
         
         # Handle reset commands
@@ -466,135 +462,6 @@ class JemaEngine:
         self.llm.add_to_history("assistant", response)
         
         return self._build_response(response, [])
-
-    def _apply_profile_filters(self, df):
-        """
-        Filters a recipe dataframe using the user's profile.
-        Called inside _handle_ingredient_based() after ingredient
-        matching, before the final cap of 3 suggestions.
-
-        Silently returns the original df if:
-        - No profile is set
-        - Profile has all defaults (no restrictions)
-
-        Never raises — if filtering fails for any reason,
-        returns the original unfiltered df.
-        """
-        if not self.user_profile:
-            return df
-
-        try:
-            p = self.user_profile
-
-            # ── HALAL ──────────────────────────────────────────────
-            if p.get("is_halal"):
-                HARAM = [
-                    "pork", "bacon", "ham", "lard",
-                    "wine", "beer", "alcohol", "rum"
-                ]
-                for item in HARAM:
-                    df = df[~df["core_ingredients"].str.contains(
-                        item, case=False, na=False
-                    )]
-
-            # ── VEGETARIAN ─────────────────────────────────────────
-            if p.get("is_vegetarian"):
-                MEATS = [
-                    "beef", "chicken", "pork", "lamb",
-                    "goat", "mutton", "meat"
-                ]
-                # Pescatarian keeps fish
-                if not p.get("is_pescatarian"):
-                    MEATS += [
-                        "fish", "shrimp", "prawn",
-                        "tuna", "tilapia", "salmon"
-                    ]
-                for item in MEATS:
-                    df = df[~df["core_ingredients"].str.contains(
-                        item, case=False, na=False
-                    )]
-
-            # ── VEGAN ──────────────────────────────────────────────
-            if p.get("is_vegan"):
-                ANIMAL = [
-                    "egg", "milk", "cream", "butter",
-                    "cheese", "yogurt", "honey", "ghee"
-                ]
-                for item in ANIMAL:
-                    df = df[~df["core_ingredients"].str.contains(
-                        item, case=False, na=False
-                    )]
-
-            # ── DIABETES ───────────────────────────────────────────
-            if p.get("has_diabetes"):
-                HIGH_GI = [
-                    "white rice", "white bread",
-                    "white flour", "sugar", "honey",
-                    "condensed milk"
-                ]
-                for item in HIGH_GI:
-                    df = df[~df["core_ingredients"].str.contains(
-                        item, case=False, na=False
-                    )]
-
-            # ── HYPERTENSION ───────────────────────────────────────
-            if p.get("has_hypertension"):
-                HIGH_SODIUM = [
-                    "salt fish", "salted fish",
-                    "soy sauce", "stock cube",
-                    "maggi", "bouillon"
-                ]
-                for item in HIGH_SODIUM:
-                    df = df[~df["core_ingredients"].str.contains(
-                        item, case=False, na=False
-                    )]
-
-            # ── ALLERGIES ──────────────────────────────────────────
-            ALLERGY_MAP = {
-                "gluten": [
-                    "wheat", "flour", "bread",
-                    "pasta", "barley"
-                ],
-                "dairy": [
-                    "milk", "cream", "butter",
-                    "cheese", "yogurt"
-                ],
-                "nut": [
-                    "peanut", "almond", "cashew",
-                    "walnut", "pecan"
-                ],
-                "shellfish": [
-                    "shrimp", "crab", "lobster",
-                    "prawn", "clam"
-                ],
-                "lactose": [
-                    "milk", "cream", "cheese", "yogurt"
-                ],
-            }
-            for allergy in p.get("allergies", []):
-                if allergy in ("no allergies", "none", ""):
-                    continue
-                keywords = ALLERGY_MAP.get(allergy, [allergy])
-                for keyword in keywords:
-                    df = df[~df["core_ingredients"].str.contains(
-                        keyword, case=False, na=False
-                    )]
-
-            # ── DISLIKES (soft exclude) ────────────────────────────
-            for dislike in p.get("dislikes", []):
-                if dislike and dislike not in ("none", "no", ""):
-                    df = df[~df["core_ingredients"].str.contains(
-                        dislike, case=False, na=False
-                    )]
-
-        except Exception as e:
-            # Never let filtering break the suggestion flow
-            logger.warning(
-                f"[JemaEngine] Profile filter failed: {e} "
-                f"— returning unfiltered results"
-            )
-
-        return df
 
     def _handle_recipe_selection(self, user_input: str) -> Optional[Dict]:
         """Handle user selecting from suggested recipes."""
@@ -930,13 +797,6 @@ class JemaEngine:
         strong_csv.sort(key=lambda x: x[0], reverse=True)
         csv_results = [recipe for _, recipe in strong_csv][:3]
 
-        # Apply profile-based filters (dietary restrictions, allergies, medical conditions)
-        # Convert to dataframe for filtering, then back to list
-        if csv_results:
-            csv_df = pd.DataFrame(csv_results)
-            csv_df = self._apply_profile_filters(csv_df)
-            csv_results = csv_df.to_dict('records')
-
         # Build seen names from CSV results
         seen_names = {
             self._normalize_recipe_name(r.get("meal_name", ""))
@@ -1234,11 +1094,7 @@ class JemaEngine:
         else:
             # Try to generate a rich recipe using the new generate_recipe method for CSV recipes
             if self.llm.client is not None:
-                rich_recipe = self.llm.generate_recipe(
-                    recipe_name,
-                    country,
-                    user_profile=self.user_profile,
-                )
+                rich_recipe = self.llm.generate_recipe(recipe_name, country)
                 if rich_recipe:
                     # generate_recipe() now returns a fully formatted string
                     message = rich_recipe
