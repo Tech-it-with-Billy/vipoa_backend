@@ -1,7 +1,11 @@
+import logging
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from django.db import IntegrityError, transaction
 from django.db.models import Count
+from django.contrib.auth import get_user_model
 from .models import Profile, Referral
 from .constants import PROFILE_COMPLETION_FIELDS
 from .serializers import (
@@ -11,6 +15,9 @@ from .serializers import (
     ReferralSerializer,
     ReferralLeaderboardSerializer,
 )
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 # -----------------------------
@@ -89,9 +96,32 @@ class ReferralCreateView(APIView):
         if Referral.objects.filter(referred_user=request.user).exists():
             return Response({"error": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
 
-        referral = Referral.objects.create(
-            referrer=referrer_profile,
-            referred_user=request.user
+        try:
+            with transaction.atomic():
+                # Serialize requests for the same referred user to avoid races.
+                User.objects.select_for_update().get(pk=request.user.pk)
+
+                if Referral.objects.filter(referred_user=request.user).exists():
+                    return Response({"error": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
+
+                referral = Referral.objects.create(
+                    referrer=referrer_profile.user,
+                    referred_user=request.user,
+                )
+        except IntegrityError:
+            logger.warning(
+                "referral.create_integrity_error user_id=%s referrer_user_id=%s code=%s",
+                request.user.id,
+                referrer_profile.user_id,
+                referral_code,
+            )
+            return Response({"error": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(
+            "referral.create_success user_id=%s referrer_user_id=%s referral_id=%s",
+            request.user.id,
+            referrer_profile.user_id,
+            referral.id,
         )
 
         serializer = ReferralSerializer(referral)
@@ -105,7 +135,7 @@ class ReferralCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        count = Referral.objects.filter(referrer=request.user.profile).count()
+        count = request.user.referrals_made.count()
         return Response({"referral_count": count})
 
 
@@ -117,7 +147,7 @@ class ReferralLeaderboardView(APIView):
 
     def get(self, request):
         leaderboard = (
-            Profile.objects.annotate(referral_count=Count("referrals"))
+            Profile.objects.annotate(referral_count=Count("user__referrals_made", distinct=True))
             .order_by("-referral_count")[:10]
         )
         serializer = ReferralLeaderboardSerializer(leaderboard, many=True)

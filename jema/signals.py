@@ -1,12 +1,18 @@
 # jema/signals.py
+import logging
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from jema.models import ChatMessage
 from rewards.services.events import award_jema_first_interaction
-from django.conf import settings
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 @receiver(post_save, sender=ChatMessage)
-def award_first_jema_interaction(sender, instance: ChatMessage, created: bool, **kwargs):
+def award_jema_first_message(sender, instance: ChatMessage, created: bool, **kwargs):
     """
     Trigger reward for first Jema interaction.
 
@@ -32,6 +38,7 @@ def award_first_jema_interaction(sender, instance: ChatMessage, created: bool, *
     try:
         user = User.objects.get(id=session.user_id)
     except User.DoesNotExist:
+        logger.warning("jema.reward_user_not_found session_id=%s user_id=%s", session.id, session.user_id)
         return
 
     # -----------------------------
@@ -48,4 +55,15 @@ def award_first_jema_interaction(sender, instance: ChatMessage, created: bool, *
     # -----------------------------
     # Delegate to rewards app
     # -----------------------------
-    award_first_jema_interaction(user=user)
+    try:
+        result = award_jema_first_interaction(user=user)
+        logger.info(
+            "jema.first_interaction_reward user_id=%s session_id=%s outcome=%s",
+            user.id,
+            session.id,
+            result.outcome,
+        )
+    except Exception:
+        logger.exception("jema.first_interaction_reward_failed user_id=%s session_id=%s", user.id, session.id)
+        if settings.DEBUG:
+            raise

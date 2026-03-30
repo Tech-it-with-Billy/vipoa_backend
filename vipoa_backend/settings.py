@@ -82,7 +82,7 @@ INSTALLED_APPS = [
     "drf_yasg",
 
     # Local Apps
-    "jema",
+    "jema.apps.JemaConfig",
     "products",
     "reviews",
     "profiles.apps.ProfilesConfig",
@@ -321,4 +321,21 @@ LOGGING = {
 
         "level": "INFO",
     },
+}
+
+
+# -----------------------------
+# REFERRAL REWARD CONFIG
+# -----------------------------
+
+REFERRAL_REWARD_MILESTONES = {
+    1: 10,
+    2: 10,
+    3: 10,
+    4: 10,
+    5: 10,
+    6: 10,
+    7: 10,
+    8: 10,
+    9: 10,
 }

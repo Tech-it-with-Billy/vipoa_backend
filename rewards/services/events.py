@@ -32,14 +32,15 @@ def award_profile_completion(*, user):
         is_done=True,
     )
 
-def award_referral_milestone(*, user, milestone: int, count: int):
+def award_referral_milestone(*, user, milestone: int, count: int, amount: int | None = None):
     ref_key = referral_milestone_key(user.id, milestone)
+    reward_amount = REFERRAL_MILESTONE_REWARD if amount is None else amount
 
     return PoaPointsEngine.process_award(
         user=user,
         event_type=RewardEventType.REFERRAL_MILESTONE,
         reference_key=ref_key,
-        amount=REFERRAL_MILESTONE_REWARD,
+        amount=reward_amount,
         meta={"milestone": milestone, "count": count},
         require_verified=False,
         is_verified=True,
