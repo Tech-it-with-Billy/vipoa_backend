@@ -30,6 +30,16 @@ class LLMService:
         self.response_cache: Dict[str, str] = {}  # Simple cache to avoid duplicate requests
         self.last_request_time = 0  # Rate limiting
         
+        # Initialize system prompt first (always needed)
+        self.system_prompt_template = """You are Jema, a friendly African cooking assistant. 
+Help users discover meals and prepare dishes from across the African continent — all African cuisines are welcome.
+
+Style: short, simple, friendly, to the point. Plain text only.
+
+{language_instruction}"""
+
+        self.system_prompt = self.system_prompt_template.format(language_instruction="Respond in English.")
+        
         if Groq is None:
             print("Warning: Groq not installed; LLM features will use defaults.")
             return
@@ -45,15 +55,6 @@ class LLMService:
         except Exception as e:
             print(f"Warning: Failed to initialize Groq: {e}")
             self.client = None
-
-        self.system_prompt_template = """You are Jema, a friendly African cooking assistant. 
-ng Help users discover meals and prepare dishes from across the African continent — all African cuisines are welcome.
-
-Style: short, simple, friendly, to the point. Plain text only.
-
-{language_instruction}"""
-
-        self.system_prompt = self.system_prompt_template.format(language_instruction="Respond in English.")
 
     def _wait_for_rate_limit(self):
         """Rate limiting helper to respect API limits."""

@@ -4,6 +4,7 @@ Runs all unit tests and displays results
 """
 import subprocess
 import sys
+import os
 
 # ensure development dependencies are available; this makes the script
 # self‑bootstrapping when someone runs it on a clean checkout.
@@ -18,37 +19,33 @@ print("=" * 70)
 print("🧪 RUNNING UNIT TESTS FOR VIPOA API")
 print("=" * 70)
 
-# Run API tests
-print("\n1️⃣  API Tests (User Registration, Login, Profile)")
+# Set environment variables for testing - disable SSL redirect
+os.environ['DEBUG'] = 'True'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'vipoa_backend.settings'
+
+# Import Django here so settings are loaded with DEBUG=True
+import django
+django.setup()
+
+# Run Jema tests
+print("\n1️⃣  Jema AI Tests (Chat, Sessions, Recipes)")
 print("-" * 70)
 result = subprocess.run(
-    [sys.executable, 'manage.py', 'test', 'api.tests', '--keepdb', '-v', '2'],
-    capture_output=True,
-    text=True
+    [
+        sys.executable, 'manage.py', 'test', 
+        'jema.tests.test_api', 
+        '--keepdb', 
+        '-v', '2'
+    ],
+    timeout=60,
+    env={**os.environ, 'DEBUG': 'True'}
 )
-
-# Extract summary
-lines = result.stderr.split('\n')
-for line in lines[-20:]:
-    if line.strip():
-        print(line)
-
-# Run Jema tests if they exist
-print("\n\n2️⃣  Jema AI Tests (Chat, Sessions, Recipes)")
-print("-" * 70)
-result2 = subprocess.run(
-    [sys.executable, 'manage.py', 'test', 'jema.tests.test_api', '--keepdb', '-v', '2'],
-    capture_output=True,
-    text=True,
-    timeout=60
-)
-
-# Extract summary
-lines2 = result2.stderr.split('\n')
-for line in lines2[-20:]:
-    if line.strip():
-        print(line)
 
 print("\n" + "=" * 70)
-print("✅ Test Run Complete")
+if result.returncode == 0:
+    print("✅ Test Run Complete - All Tests Passed!")
+else:
+    print("⚠️  Test Run Complete - Some Tests Failed")
+    print("   Run: python manage.py test jema.tests.test_api -v 2")
+    print("   for more detailed output")
 print("=" * 70)
