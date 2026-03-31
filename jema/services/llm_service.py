@@ -800,13 +800,6 @@ Make it authentic, practical, and easy to follow. Use only real, chef-verified t
             )
             result = response.choices[0].message.content.strip()
 
-            # Append disclaimer if Groq generated freely (no verified source)
-            if source_label == "GROQ":
-                result += (
-                    "\n\n⚠️ Note: These steps are AI-generated as no verified source was found. "
-                    "We recommend cross-checking with a trusted recipe source."
-                )
-
             return result
 
         except Exception as e:
