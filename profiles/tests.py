@@ -1,6 +1,3 @@
-from unittest.mock import patch
-
-from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
@@ -14,163 +11,117 @@ from rewards.models import PoaPointsTransaction, RewardClaim
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class ReferralApiTests(TestCase):
-	def setUp(self):
-		self.client = APIClient()
-		self.referrer = SupabaseUser.objects.create_user(email="referrer@example.com")
-		self.referred = SupabaseUser.objects.create_user(email="referred@example.com")
-		self.create_url = reverse("referral-create")
-		self.leaderboard_url = reverse("referral-leaderboard")
 
-	def _authenticate(self, user):
-		self.client.force_authenticate(user=user)
+    def setUp(self):
+        self.client = APIClient()
+        self.referrer = SupabaseUser.objects.create_user(email="referrer@example.com")
+        self.referred = SupabaseUser.objects.create_user(email="referred@example.com")
+        self.profile_url = reverse("profile-me")
+        self.leaderboard_url = reverse("referral-leaderboard")
 
-	def test_referral_creation_success(self):
-		self._authenticate(self.referred)
+    def _authenticate(self, user):
+        self.client.force_authenticate(user=user)
 
-		response = self.client.post(
-			self.create_url,
-			{"referral_code": self.referrer.profile.referral_code},
-			format="json",
-		)
+    def test_referral_creation_success(self):
+        self._authenticate(self.referred)
+        response = self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Referral.objects.count(), 1)
+        self.referred.profile.refresh_from_db()
+        self.assertEqual(self.referred.profile.referred_by, self.referrer.profile.referral_code)
 
-		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-		self.assertEqual(Referral.objects.count(), 1)
+    def test_referral_creation_case_insensitive(self):
+        self._authenticate(self.referred)
+        response = self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code.lower()}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Referral.objects.count(), 1)
 
-	def test_referral_creation_compat_prefix_success(self):
-		self._authenticate(self.referred)
-		compat_url = "/profiles/referral/create/"
+    def test_duplicate_referral_silently_skipped(self):
+        self._authenticate(self.referred)
+        payload = {"referred_by": self.referrer.profile.referral_code}
+        first_response = self.client.patch(self.profile_url, payload, format="json")
+        second_response = self.client.patch(self.profile_url, payload, format="json")
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Referral.objects.count(), 1)
 
-		response = self.client.post(
-			compat_url,
-			{"referral_code": self.referrer.profile.referral_code.lower()},
-			format="json",
-		)
+    def test_self_referral_silently_skipped(self):
+        self._authenticate(self.referrer)
+        response = self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Referral.objects.count(), 0)
 
-		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-		self.assertEqual(Referral.objects.count(), 1)
+    def test_invalid_referral_code_silently_skipped(self):
+        self._authenticate(self.referred)
+        response = self.client.patch(self.profile_url, {"referred_by": "INVALIDCODE"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Referral.objects.count(), 0)
 
-	def test_duplicate_referral_prevention(self):
-		self._authenticate(self.referred)
-		payload = {"referral_code": self.referrer.profile.referral_code}
+    def test_referred_by_only_accepted_once(self):
+        other_referrer = SupabaseUser.objects.create_user(email="other@example.com")
+        self._authenticate(self.referred)
+        self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code}, format="json")
+        self.client.patch(self.profile_url, {"referred_by": other_referrer.profile.referral_code}, format="json")
+        self.assertEqual(Referral.objects.filter(referred_user=self.referred).count(), 1)
+        self.referred.profile.refresh_from_db()
+        self.assertEqual(self.referred.profile.referred_by, self.referrer.profile.referral_code)
 
-		first_response = self.client.post(self.create_url, payload, format="json")
-		second_response = self.client.post(self.create_url, payload, format="json")
-
-		self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
-		self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
-		self.assertEqual(Referral.objects.count(), 1)
-
-	def test_self_referral_prevention(self):
-		self._authenticate(self.referrer)
-
-		response = self.client.post(
-			self.create_url,
-			{"referral_code": self.referrer.profile.referral_code},
-			format="json",
-		)
-
-		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-		self.assertEqual(response.data["error"], "Cannot refer yourself.")
-
-	def test_invalid_referral_code(self):
-		self._authenticate(self.referred)
-
-		response = self.client.post(
-			self.create_url,
-			{"referral_code": "INVALIDCODE"},
-			format="json",
-		)
-
-		self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-		self.assertEqual(response.data["error"], "Invalid referral code.")
-
-	def test_integrity_error_returns_duplicate_response(self):
-		self._authenticate(self.referred)
-
-		with patch("profiles.views.Referral.objects.create", side_effect=IntegrityError):
-			response = self.client.post(
-				self.create_url,
-				{"referral_code": self.referrer.profile.referral_code},
-				format="json",
-			)
-
-		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-		self.assertEqual(response.data["error"], "Referral already applied.")
-
-	def test_referral_leaderboard_uses_correct_relation(self):
-		other_referrer = SupabaseUser.objects.create_user(email="referrer2@example.com")
-		user_a = SupabaseUser.objects.create_user(email="a@example.com")
-		user_b = SupabaseUser.objects.create_user(email="b@example.com")
-		user_c = SupabaseUser.objects.create_user(email="c@example.com")
-
-		Referral.objects.create(referrer=self.referrer, referred_user=user_a)
-		Referral.objects.create(referrer=self.referrer, referred_user=user_b)
-		Referral.objects.create(referrer=other_referrer, referred_user=user_c)
-
-		self._authenticate(self.referred)
-		response = self.client.get(self.leaderboard_url)
-
-		self.assertEqual(response.status_code, status.HTTP_200_OK)
-		self.assertGreaterEqual(len(response.data), 2)
-		self.assertEqual(response.data[0]["user"], self.referrer.id)
-		self.assertEqual(response.data[0]["referral_count"], 2)
+    def test_referral_leaderboard_uses_correct_relation(self):
+        other_referrer = SupabaseUser.objects.create_user(email="referrer2@example.com")
+        user_a = SupabaseUser.objects.create_user(email="a@example.com")
+        user_b = SupabaseUser.objects.create_user(email="b@example.com")
+        user_c = SupabaseUser.objects.create_user(email="c@example.com")
+        Referral.objects.create(referrer=self.referrer, referred_user=user_a)
+        Referral.objects.create(referrer=self.referrer, referred_user=user_b)
+        Referral.objects.create(referrer=other_referrer, referred_user=user_c)
+        self._authenticate(self.referred)
+        response = self.client.get(self.leaderboard_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["user"], self.referrer.id)
+        self.assertEqual(response.data[0]["referral_count"], 2)
 
 
 @override_settings(REFERRAL_REWARD_MILESTONES={2: 10}, SECURE_SSL_REDIRECT=False)
 class ReferralRewardSignalTests(TestCase):
-	def setUp(self):
-		self.client = APIClient()
-		self.referrer = SupabaseUser.objects.create_user(email="reward-referrer@example.com")
-		self.create_url = reverse("referral-create")
 
-	def _apply_referral(self, suffix: str):
-		referred_user = SupabaseUser.objects.create_user(email=f"referred-{suffix}@example.com")
-		self.client.force_authenticate(user=referred_user)
-		return self.client.post(
-			self.create_url,
-			{"referral_code": self.referrer.profile.referral_code},
-			format="json",
-		)
+    def setUp(self):
+        self.client = APIClient()
+        self.referrer = SupabaseUser.objects.create_user(email="reward-referrer@example.com")
+        self.profile_url = reverse("profile-me")
 
-	def test_reward_not_applied_before_milestone(self):
-		response = self._apply_referral("one")
+    def _apply_referral(self, suffix):
+        referred_user = SupabaseUser.objects.create_user(email="referred-{}@example.com".format(suffix))
+        self.client.force_authenticate(user=referred_user)
+        return self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code}, format="json")
 
-		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-		self.assertFalse(
-			PoaPointsTransaction.objects.filter(
-				user=self.referrer,
-				type=RewardEventType.REFERRAL_MILESTONE,
-			).exists()
-		)
+    def test_reward_not_applied_before_milestone(self):
+        response = self._apply_referral("one")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(PoaPointsTransaction.objects.filter(user=self.referrer, type=RewardEventType.REFERRAL_MILESTONE).exists())
 
-	def test_reward_applied_at_milestone(self):
-		self._apply_referral("one")
-		response = self._apply_referral("two")
+    def test_reward_applied_at_milestone(self):
+        self._apply_referral("one")
+        response = self._apply_referral("two")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        key = referral_milestone_key(self.referrer.id, 2)
+        tx = PoaPointsTransaction.objects.get(reference_key=key)
+        self.assertEqual(tx.amount, 10)
 
-		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+    def test_reward_not_duplicated_after_milestone(self):
+        self._apply_referral("one")
+        self._apply_referral("two")
+        self._apply_referral("three")
+        key = referral_milestone_key(self.referrer.id, 2)
+        self.assertEqual(PoaPointsTransaction.objects.filter(reference_key=key).count(), 1)
+        self.assertEqual(RewardClaim.objects.filter(user=self.referrer, reference_key=key).count(), 1)
 
-		key = referral_milestone_key(self.referrer.id, 2)
-		tx = PoaPointsTransaction.objects.get(reference_key=key)
-		self.assertEqual(tx.amount, 10)
-
-	def test_reward_not_duplicated_after_milestone(self):
-		self._apply_referral("one")
-		self._apply_referral("two")
-		self._apply_referral("three")
-
-		key = referral_milestone_key(self.referrer.id, 2)
-		self.assertEqual(PoaPointsTransaction.objects.filter(reference_key=key).count(), 1)
-		self.assertEqual(RewardClaim.objects.filter(user=self.referrer, reference_key=key).count(), 1)
-
-	def test_repeated_request_does_not_duplicate_reward(self):
-		repeated_user = SupabaseUser.objects.create_user(email="repeated@example.com")
-		self.client.force_authenticate(user=repeated_user)
-		payload = {"referral_code": self.referrer.profile.referral_code}
-
-		first = self.client.post(self.create_url, payload, format="json")
-		second = self.client.post(self.create_url, payload, format="json")
-
-		self.assertEqual(first.status_code, status.HTTP_201_CREATED)
-		self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
-		self.assertEqual(Referral.objects.filter(referred_user=repeated_user).count(), 1)
-
+    def test_repeated_request_does_not_duplicate_reward(self):
+        repeated_user = SupabaseUser.objects.create_user(email="repeated@example.com")
+        self.client.force_authenticate(user=repeated_user)
+        payload = {"referred_by": self.referrer.profile.referral_code}
+        first = self.client.patch(self.profile_url, payload, format="json")
+        second = self.client.patch(self.profile_url, payload, format="json")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(Referral.objects.filter(referred_user=repeated_user).count(), 1)

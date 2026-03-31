@@ -45,6 +45,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
             "profile_completed_awarded",
             "updated_at",
             "referral_code",
+                "referred_by",
         ]
 
     def update(self, instance, validated_data):

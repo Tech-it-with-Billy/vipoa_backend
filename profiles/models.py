@@ -120,6 +120,7 @@ class Profile(models.Model):
     # REFERRAL
     # -----------------------------
     referral_code = models.CharField(max_length=12, unique=True, blank=True)
+    referred_by = models.CharField(max_length=12, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 

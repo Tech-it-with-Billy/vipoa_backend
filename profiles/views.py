@@ -12,12 +12,46 @@ from .serializers import (
     ProfileReadSerializer,
     ProfileUpdateSerializer,
     ProfileCompletionStatusSerializer,
-    ReferralSerializer,
     ReferralLeaderboardSerializer,
 )
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+# -----------------------------
+# REFERRAL HELPER
+# -----------------------------
+def _process_referred_by(user, profile, code: str):
+    """
+    Process a referral code submitted during initial profile setup.
+    - Silently skips if code is invalid, self-referral, or referral already exists.
+    - Creates the Referral record (reward signal fires automatically).
+    - Stores the code in profile.referred_by so it is only processed once.
+    """
+    try:
+        referrer_profile = Profile.objects.get(referral_code__iexact=code)
+    except Profile.DoesNotExist:
+        logger.warning("referral.invalid_code user_id=%s code=%s", user.id, code)
+        return
+
+    if referrer_profile.user_id == user.pk:
+        logger.warning("referral.self_referral user_id=%s", user.id)
+        return
+
+    if Referral.objects.filter(referred_user=user).exists():
+        return
+
+    try:
+        with transaction.atomic():
+            if Referral.objects.filter(referred_user=user).exists():
+                return
+            Referral.objects.create(referrer=referrer_profile.user, referred_user=user)
+        Profile.objects.filter(pk=profile.pk).update(referred_by=code.upper())
+        profile.referred_by = code.upper()
+        logger.info("referral.applied user_id=%s referrer_user_id=%s code=%s", user.id, referrer_profile.user_id, code)
+    except IntegrityError:
+        logger.warning("referral.integrity_error user_id=%s code=%s", user.id, code)
 
 
 # -----------------------------
@@ -31,10 +65,17 @@ class ProfileMeView(APIView):
 
     def patch(self, request):
         profile = request.user.profile
-        serializer = ProfileUpdateSerializer(profile, data=request.data, partial=True)
+        referred_by_code = (request.data.get("referred_by") or "").strip().upper()
+        data = {k: v for k, v in request.data.items() if k != "referred_by"}
+
+        serializer = ProfileUpdateSerializer(profile, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         profile.refresh_from_db()
+
+        if referred_by_code and not profile.referred_by:
+            _process_referred_by(request.user, profile, referred_by_code)
+
         return Response(ProfileReadSerializer(profile).data)
 
 
@@ -43,10 +84,17 @@ class ProfileUpdateView(APIView):
 
     def patch(self, request):
         profile = request.user.profile
-        serializer = ProfileUpdateSerializer(profile, data=request.data, partial=True)
+        referred_by_code = (request.data.get("referred_by") or "").strip().upper()
+        data = {k: v for k, v in request.data.items() if k != "referred_by"}
+
+        serializer = ProfileUpdateSerializer(profile, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         profile.refresh_from_db()
+
+        if referred_by_code and not profile.referred_by:
+            _process_referred_by(request.user, profile, referred_by_code)
+
         return Response(ProfileReadSerializer(profile).data)
 
     def put(self, request):
@@ -72,66 +120,7 @@ class ProfileCompletionStatusView(APIView):
 # -----------------------------
 # REFERRAL ENDPOINTS
 # -----------------------------
-class ReferralCreateView(APIView):
-    """
-    Submit a referral code when a new user signs up via a shared link.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        referral_code = (request.data.get("referral_code") or "").strip().upper()
-        if not referral_code:
-            return Response({"error": "Referral code is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            referrer_profile = Profile.objects.get(referral_code__iexact=referral_code)
-        except Profile.DoesNotExist:
-            return Response({"error": "Invalid referral code."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Prevent self-referral
-        if referrer_profile.user == request.user:
-            return Response({"error": "Cannot refer yourself."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Prevent duplicate referrals for the same user
-        if Referral.objects.filter(referred_user=request.user).exists():
-            return Response({"error": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            with transaction.atomic():
-                # Serialize requests for the same referred user to avoid races.
-                User.objects.select_for_update().get(pk=request.user.pk)
-
-                if Referral.objects.filter(referred_user=request.user).exists():
-                    return Response({"error": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
-
-                referral = Referral.objects.create(
-                    referrer=referrer_profile.user,
-                    referred_user=request.user,
-                )
-        except IntegrityError:
-            logger.warning(
-                "referral.create_integrity_error user_id=%s referrer_user_id=%s code=%s",
-                request.user.id,
-                referrer_profile.user_id,
-                referral_code,
-            )
-            return Response({"error": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
-
-        logger.info(
-            "referral.create_success user_id=%s referrer_user_id=%s referral_id=%s",
-            request.user.id,
-            referrer_profile.user_id,
-            referral.id,
-        )
-
-        serializer = ReferralSerializer(referral)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
 class ReferralCountView(APIView):
-    """
-    Return the number of referrals made by the current user
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -140,9 +129,6 @@ class ReferralCountView(APIView):
 
 
 class ReferralLeaderboardView(APIView):
-    """
-    Return top referrers sorted by referral count
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
