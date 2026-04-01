@@ -93,7 +93,9 @@ class ReferralRewardSignalTests(TestCase):
     def _apply_referral(self, suffix):
         referred_user = SupabaseUser.objects.create_user(email="referred-{}@example.com".format(suffix))
         self.client.force_authenticate(user=referred_user)
-        return self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code}, format="json")
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.patch(self.profile_url, {"referred_by": self.referrer.profile.referral_code}, format="json")
+        return response
 
     def test_reward_not_applied_before_milestone(self):
         response = self._apply_referral("one")
@@ -120,8 +122,10 @@ class ReferralRewardSignalTests(TestCase):
         repeated_user = SupabaseUser.objects.create_user(email="repeated@example.com")
         self.client.force_authenticate(user=repeated_user)
         payload = {"referred_by": self.referrer.profile.referral_code}
-        first = self.client.patch(self.profile_url, payload, format="json")
-        second = self.client.patch(self.profile_url, payload, format="json")
+        with self.captureOnCommitCallbacks(execute=True):
+            first = self.client.patch(self.profile_url, payload, format="json")
+        with self.captureOnCommitCallbacks(execute=True):
+            second = self.client.patch(self.profile_url, payload, format="json")
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(Referral.objects.filter(referred_user=repeated_user).count(), 1)

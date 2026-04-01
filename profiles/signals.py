@@ -1,13 +1,11 @@
 import logging
 
-from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from .models import Profile, Referral
 from rewards.models.wallet import PoaPointsAccount
 from rewards.services.events import award_profile_completion
-from .referral_rewards import process_referral_rewards
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -53,36 +51,15 @@ def check_profile_completion(sender, instance: Profile, created, **kwargs):
 @receiver(post_save, sender=Referral)
 def check_referral_milestone(sender, instance: Referral, created, **kwargs):
     """
-    Thin signal handler that delegates referral rewards to service layer.
-    Marks reward_granted=True on the Referral row when at least one milestone
-    award is successfully issued.
+    Logging-only signal handler.
+    Reward processing is handled via transaction.on_commit() in _process_referred_by()
+    to guarantee points are only awarded after the DB transaction commits successfully.
     """
     if not created:
         return
 
-    referrer_user = instance.referrer
-    total_referrals = referrer_user.referrals_made.count()
-
     logger.info(
-        "referral.created user_id=%s referred_user_id=%s referral_count=%s",
-        referrer_user.id,
+        "referral.created user_id=%s referred_user_id=%s",
+        instance.referrer_id,
         instance.referred_user_id,
-        total_referrals,
     )
-
-    try:
-        results = process_referral_rewards(referrer_user=referrer_user, referral_count=total_referrals)
-        # Mark the referral as reward_granted if any milestone award succeeded
-        if results and any(
-            getattr(result, "outcome", None) in ("awarded", "success", True)
-            for _, result in results
-        ):
-            Referral.objects.filter(pk=instance.pk).update(reward_granted=True)
-    except Exception:
-        logger.exception(
-            "referral.signal_failure user_id=%s referral_count=%s",
-            referrer_user.id,
-            total_referrals,
-        )
-        if settings.DEBUG:
-            raise
