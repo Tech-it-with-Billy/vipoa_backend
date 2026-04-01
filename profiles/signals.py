@@ -54,6 +54,8 @@ def check_profile_completion(sender, instance: Profile, created, **kwargs):
 def check_referral_milestone(sender, instance: Referral, created, **kwargs):
     """
     Thin signal handler that delegates referral rewards to service layer.
+    Marks reward_granted=True on the Referral row when at least one milestone
+    award is successfully issued.
     """
     if not created:
         return
@@ -69,7 +71,13 @@ def check_referral_milestone(sender, instance: Referral, created, **kwargs):
     )
 
     try:
-        process_referral_rewards(referrer_user=referrer_user, referral_count=total_referrals)
+        results = process_referral_rewards(referrer_user=referrer_user, referral_count=total_referrals)
+        # Mark the referral as reward_granted if any milestone award succeeded
+        if results and any(
+            getattr(result, "outcome", None) in ("awarded", "success", True)
+            for _, result in results
+        ):
+            Referral.objects.filter(pk=instance.pk).update(reward_granted=True)
     except Exception:
         logger.exception(
             "referral.signal_failure user_id=%s referral_count=%s",
