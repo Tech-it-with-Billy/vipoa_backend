@@ -68,11 +68,16 @@ def get_engine():
             raise
     return _engine
 
-def get_session_engine(session_id: int):
-    """Get or create a per-session engine instance for state isolation."""
+def get_session_engine(session_id: int, user=None):
+    \"\"\"Get or create a per-session engine instance for state isolation.
+    
+    Args:
+        session_id: The chat session ID
+        user: Optional Django User object for personalization
+    \"\"\"
     if session_id not in _session_engines:
         try:
-            _session_engines[session_id] = JemaEngine()
+            _session_engines[session_id] = JemaEngine(user=user)
         except Exception as e:
             logger.error(f"Failed to initialize session engine {session_id}: {e}")
             raise
@@ -120,11 +125,22 @@ def chat(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Fetch user for personalization (optional)
+        user = None
+        if user_id:
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                user = User.objects.get(id=user_id)
+            except Exception as e:
+                logger.debug(f"Could not fetch user {user_id}: {e}")
+                user = None
+        
         # Get session-specific engine for state isolation
         if session_id:
             try:
                 session_id_int = int(session_id)
-                engine = get_session_engine(session_id_int)
+                engine = get_session_engine(session_id_int, user=user)
             except (ValueError, TypeError):
                 # Invalid session_id, use global engine
                 engine = get_engine()
