@@ -5,6 +5,7 @@ Filters out Caribbean/non-African dishes.
 """
 
 import re
+import difflib
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -39,6 +40,12 @@ class PDFRecipeStore:
     def __init__(self):
         self.recipes: Dict[str, Dict] = {}
         self._load_pdf()
+        
+        # Debug output showing name-content pairing
+        for name, data in self.recipes.items():
+            first_ingredient = str(data.get('ingredients_raw', ''))[:80]
+            first_step = str(data.get('steps', [''])[0])[:80] if data.get('steps') else ''
+            print(f"[PDF PARSE DEBUG] Name: '{name}' | First ingredient: '{first_ingredient}' | First step: '{first_step}'")
 
     def _load_pdf(self):
         """Extract and store all African recipes from the PDF."""
@@ -63,49 +70,67 @@ class PDFRecipeStore:
 
     def _parse_recipes(self, text: str):
         """
-        Parse recipe blocks from extracted PDF text.
-        Strategy: collect ALL numbered lines per recipe name match.
+        Parse recipe blocks from extracted PDF text using a strict buffer pattern.
+        Each recipe name is paired only with the content that follows it, preventing offset bugs.
         """
         lines = text.split("\n")
-        current_recipe = None
-        buffer = []
-
+        
+        # Normalize recipe names for matching
+        recipe_names_normalized = {name.lower().strip(): name for name in AFRICAN_RECIPES}
+        exclude_names_normalized = {name.lower().strip() for name in CARIBBEAN_RECIPES}
+        
+        current_recipe_name = None
+        current_recipe_buffer = []
+        
         for line in lines:
             stripped = line.strip()
             if not stripped:
                 continue
-
-            lower = stripped.lower()
-
-            # Skip Caribbean recipes immediately
-            if any(c in lower for c in CARIBBEAN_RECIPES):
-                current_recipe = None
-                buffer = []
+            
+            line_lower = stripped.lower()
+            
+            # Check if this line contains a recipe name (exact match, not substring)
+            matched_name = None
+            for normalized_name, original_name in recipe_names_normalized.items():
+                if line_lower == normalized_name or (line_lower.endswith(normalized_name) and len(line_lower) < 100):
+                    # Further check: make sure the line is short (recipe titles are typically short)
+                    if len(stripped.split()) <= 5:  # Most recipe titles are 1-4 words
+                        matched_name = normalized_name
+                        break
+            
+            # Check if line contains excluded names
+            is_excluded = any(excl in line_lower for excl in exclude_names_normalized)
+            
+            if matched_name and not is_excluded:
+                # Save the previous recipe before starting a new one
+                if current_recipe_name and current_recipe_buffer:
+                    self._save_recipe(current_recipe_name, current_recipe_buffer)
+                
+                # Start new recipe
+                current_recipe_name = matched_name
+                current_recipe_buffer = []
                 continue
-
-            # Detect recipe title
-            matched = self._match_recipe_name(lower)
-            if matched:
-                # Save previous recipe before starting new one
-                if current_recipe and buffer:
-                    self._save_recipe(current_recipe, buffer)
-                current_recipe = matched
-                buffer = []
+            
+            # If we're in an excluded recipe, skip all lines until next recipe name
+            if is_excluded:
+                current_recipe_name = None
+                current_recipe_buffer = []
                 continue
-
+            
             # Accumulate lines for current recipe
-            if current_recipe:
-                buffer.append(stripped)
-
+            if current_recipe_name is not None:
+                current_recipe_buffer.append(stripped)
+        
         # Save the final recipe
-        if current_recipe and buffer:
-            self._save_recipe(current_recipe, buffer)
+        if current_recipe_name and current_recipe_buffer:
+            self._save_recipe(current_recipe_name, current_recipe_buffer)
 
     def _match_recipe_name(self, line: str) -> Optional[str]:
-        """Check if line contains a known African recipe name."""
-        # Check African recipes
+        """Check if line contains a known African recipe name (legacy - now handled in _parse_recipes)."""
+        # This is kept for backward compatibility but is not used by the new buffer pattern
+        line_lower = line.lower().strip()
         for name in AFRICAN_RECIPES:
-            if name in line and len(line) < 80:  # Recipe titles are typically short
+            if name in line_lower and len(line_lower) < 80:
                 return name
         return None
 
@@ -138,12 +163,13 @@ class PDFRecipeStore:
         - Steps from both components clearly separated
         - Tips from both components
 
-        Returns None if not a compound meal.
+        Returns None if not a compound meal or components cannot be found.
         """
         name_lower = recipe_name.lower().strip()
         components = self.COMPOUND_MEALS.get(name_lower)
 
         if not components:
+            print(f"[PDF DEBUG] '{recipe_name}' is not a known compound meal")
             return None
 
         combined_ingredients = []
@@ -178,8 +204,10 @@ class PDFRecipeStore:
                 combined_tips.extend(component_recipe.get("tips", []))
 
         if not found_components:
+            print(f"[PDF DEBUG] Compound meal '{recipe_name}' has no findable components in PDF")
             return None
 
+        print(f"[PDF DEBUG] Compound meal found: {' + '.join(found_components)}")
         return {
             "meal_name":       recipe_name.title(),
             "is_compound":     True,
@@ -237,32 +265,55 @@ class PDFRecipeStore:
 
     def lookup(self, recipe_name: str) -> Optional[Dict]:
         """
-        Look up a recipe by name.
+        Look up a recipe by name with strict matching.
+        
+        Strategy:
+        1. Exact match (case-insensitive, whitespace trimmed)
+        2. Close match with 0.75 cutoff and guards
+        3. Return None if no match found
         
         Returns dict with meal_name, ingredients_raw, steps, tips.
-        Returns None ONLY if recipe not found (not based on step count).
-        Even recipes with few steps are returned to enable Tavily fallback.
-        
-        Args:
-            recipe_name: Recipe name to look up
-        
-        Returns:
-            Recipe dict if found, None if not found
+        Returns None ONLY if recipe not found.
         """
         if not recipe_name:
             return None
+        
+        query = recipe_name.strip().lower()
+        
+        print(f"[PDF DEBUG] Looking up: '{recipe_name}' in {len(self.recipes)} PDF recipes")
+        print(f"[PDF DEBUG] PDF recipe names: {[r for r in self.recipes.keys()]}")
+        
+        # Step 1: Exact match
+        for stored_name in self.recipes.keys():
+            stored_name_lower = stored_name.strip().lower()
+            if stored_name_lower == query:
+                print(f"[PDF DEBUG] Exact match found: '{stored_name}'")
+                return self.recipes[stored_name]
+        
+        # Step 2: Close match with high threshold and guards
+        stored_names = [str(name).strip().lower() for name in self.recipes.keys()]
+        matches = difflib.get_close_matches(query, stored_names, n=1, cutoff=0.75)
+        
+        if matches:
+            matched_lower = matches[0]
             
-        key = recipe_name.lower().strip()
+            # Guard 1: reject if length differs by more than 4 characters
+            if abs(len(matched_lower) - len(query)) > 4:
+                print(f"[PDF DEBUG] Rejected close match '{matched_lower}' — length too different from '{query}'")
+                return None
+            
+            # Guard 2: reject if query has more words than matched name
+            if len(query.split()) > len(matched_lower.split()) + 1:
+                print(f"[PDF DEBUG] Rejected close match '{matched_lower}' — query has more words than match")
+                return None
+            
+            # Find the original recipe with matching name
+            for original_name in self.recipes.keys():
+                if original_name.strip().lower() == matched_lower:
+                    print(f"[PDF DEBUG] Close match found: '{original_name}'")
+                    return self.recipes[original_name]
         
-        # Direct match
-        if key in self.recipes:
-            return self.recipes[key]
-        
-        # Partial match — check if recipe name contains or is contained in search term
-        for stored_name, data in self.recipes.items():
-            if stored_name in key or key in stored_name:
-                return data
-        
+        print(f"[PDF DEBUG] No match found in PDF for '{recipe_name}'")
         return None
 
     def get_all_recipes(self) -> List[str]:
