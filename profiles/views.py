@@ -120,6 +120,43 @@ class ProfileCompletionStatusView(APIView):
 # -----------------------------
 # REFERRAL ENDPOINTS
 # -----------------------------
+class ReferralCreateView(APIView):
+    """
+    POST /api/profiles/referral/create/
+    Body: {"referral_code": "<code>"}
+
+    Called by the Flutter client after login/signup to register that the
+    current user was referred by someone. Idempotent — safe to call more
+    than once; duplicates are silently ignored.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        code = (request.data.get("referral_code") or "").strip().upper()
+        if not code:
+            return Response({"detail": "referral_code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        profile = user.profile
+
+        # Already used a referral code before → reject
+        if profile.referred_by:
+            return Response({"detail": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Referral row already exists for this user → reject
+        if Referral.objects.filter(referred_user=user).exists():
+            return Response({"detail": "Referral already applied."}, status=status.HTTP_400_BAD_REQUEST)
+
+        _process_referred_by(user, profile, code)
+
+        # Check whether it actually landed (helpers swallows invalid codes silently)
+        profile.refresh_from_db()
+        if profile.referred_by:
+            return Response({"detail": "Referral applied successfully."}, status=status.HTTP_201_CREATED)
+
+        return Response({"detail": "Invalid or unrecognised referral code."}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ReferralCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
