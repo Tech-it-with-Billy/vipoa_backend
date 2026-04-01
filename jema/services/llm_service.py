@@ -2,7 +2,6 @@ import os
 import re
 import json
 import time
-import difflib
 from pathlib import Path
 from typing import List, Dict, Optional
 try:
@@ -10,45 +9,6 @@ try:
 except ImportError:
     Groq = None
 from jema.utils.language_detector import LanguageDetector
-
-
-def split_steps_paragraph(paragraph: str) -> list:
-    """
-    Split a paragraph of recipe steps into individual sentences or action blocks.
-    Handles newline-separated, action-header-separated, and period-separated formats.
-    """
-    if not paragraph or not paragraph.strip():
-        return []
-
-    # Normalize all line endings first
-    paragraph = paragraph.replace('\r\n', '\n').replace('\r', '\n')
-
-    # Remove leading method/steps prefix e.g. "Method: Boil\nSteps:" or "Steps:"
-    paragraph = re.sub(r'^(Method:[^\n]*\n)?Steps?:\s*', '', paragraph.strip(), flags=re.IGNORECASE)
-
-    # Strategy 1: Newline-separated steps (Title: content\nTitle: content)
-    lines = [line.strip() for line in paragraph.split('\n') if line.strip() and len(line.strip()) > 5]
-    if len(lines) >= 3:
-        return lines
-
-    # Strategy 2: Paragraph with action-header pattern (Title: content. Title: content.)
-    action_splits = re.split(r'(?<=\.)\s+(?=[A-Z][a-zA-Z\s\(\)]+:)', paragraph)
-    action_steps = [s.strip() for s in action_splits if s.strip() and len(s.strip()) > 5]
-    if len(action_steps) >= 3:
-        return action_steps
-
-    # Strategy 3: Plain sentence splitting (fallback)
-    sentences = re.split(r'\.\s+', paragraph.strip())
-    steps = []
-    for s in sentences:
-        s = s.strip()
-        if s and len(s) > 5:
-            if not s.endswith('.'):
-                s = s + '.'
-            steps.append(s)
-    return steps
-
-
 
 class LLMService:
     """Service to interact with LLM and manage conversation context for Jema."""
@@ -555,8 +515,6 @@ RECIPE_END"""
                                      flags=re.IGNORECASE).strip()
                     # Remove markdown bold markers
                     cleaned = re.sub(r'\*\*', '', cleaned).strip()
-                    # FIX 1: Additional cleanup for all asterisks before appending
-                    cleaned = cleaned.replace("**", "").replace("*", "").strip()
                     if cleaned and len(cleaned) > 5:
                         steps.append(cleaned)
                 elif steps and line_stripped and not line_stripped.startswith(("*", "-", "Tips")):
@@ -565,15 +523,17 @@ RECIPE_END"""
                     if continuation:
                         steps[-1] = steps[-1].rstrip(".") + " " + continuation
             
-            # Parse tips (remove asterisks and dashes, never include "Serve" suggestions)
+            # Parse tips (remove asterisks and dashes)
             elif mode == "tips":
-                # Skip "Serve with:" lines entirely — never collect them
-                if line_stripped and not line_stripped.lower().startswith("serve"):
-                    # Remove leading asterisks and dashes, then remove all remaining asterisks
+                if line_stripped and not line_stripped.startswith(("Serve", "serve")):
+                    # Remove leading asterisks and dashes
                     tip = line_stripped.lstrip("*-").strip()
-                    tip = tip.replace("*", "").strip()  # Remove all asterisks from the tip
                     if tip and len(tip) > 5:
                         tips.append(tip)
+                elif line_stripped.lower().startswith("serve"):
+                    # Keep serve suggestion
+                    tip = line_stripped.lstrip("*-").strip()
+                    tips.append(tip)
         
         # Finish intro collection if still collecting
         if intro_text:
@@ -582,378 +542,250 @@ RECIPE_END"""
         # Limit tips to 2-3 items max (keep first 3 items to ensure variety but controlled)
         tips = tips[:3]
         
-        # Filter ingredients to skip "none" values
-        def clean_text_simple(text):
-            """Remove all asterisks and clean content."""
-            if not text:
-                return text
-            text = text.replace("*", "").strip()
-            return text
-        
-        filtered_ingredients = []
-        for ing in ingredients:
-            cleaned = clean_text_simple(ing)
-            if not cleaned:
-                continue
-            if cleaned.endswith(":"):
-                continue
-            # Skip lines where the value is none, n/a, dash, or empty
-            if ":" in cleaned:
-                value = cleaned.split(":", 1)[1].strip().lower()
-                if value in ("none", "n/a", "-", "", "–"):
-                    continue
-            if len(cleaned) > 2:
-                filtered_ingredients.append(cleaned)
-        
         # Return recipe if we have at least meal_name and basic content
-        if meal_name and cuisine_region and filtered_ingredients and steps:
+        if meal_name and cuisine_region and ingredients and steps:
             return {
                 "meal_name": meal_name,
                 "cuisine_region": cuisine_region,
                 "introduction": introduction,
-                "ingredients": filtered_ingredients,
+                "ingredients": ingredients,
                 "steps": steps,
                 "tips": tips
             }
         
         return None
 
-    def generate_recipe(
-        self,
-        recipe_name: str,
-        cuisine_region: str = "",
-        language: str = "english",
-        source: str = None,
-        grounded_context: str = None,
-        csv_steps: list = None,
-        csv_ingredients: str = "",
-        csv_row=None,
-        user_profile: dict = None,
-        compound_data: dict = None,
-        variant_modifier: str = None,
-    ) -> str:
+    def generate_recipe(self, recipe_name: str, cuisine_region: str = "", language: str = "english") -> str:
         """
-        Generate a fully formatted recipe using source-aware prompting.
+        Generate a fully formatted recipe using grounded source hierarchy.
+        Always uses Groq for consistent formatting of all recipes.
         
-        Args:
-            recipe_name: The name of the recipe to generate/format
-            cuisine_region: The region/country of the recipe
-            language: Language for response ("english" or "swahili")
-            source: One of "CSV", "PDF", "TAVILY", or "GROQ". If None, attempts source hierarchy.
-            grounded_context: Raw ingredients and steps to format (used with CSV/PDF/TAVILY sources)
+        1. PDF recipe store (verified African cookbook)
+        2. Web search (Tavily - trusted African cooking sites)
+        3. Groq standalone (flagged as AI-generated)
         
-        Returns:
-            Fully formatted recipe string in canonical format
+        Returns the formatted recipe as a string with exact structure:
+        - "Great! Here's the recipe for [Name]"
+        - Introduction paragraph
+        - Cuisine: [Region]
+        - Essential Ingredients (categorized)
+        - Step-by-Step Cooking Instructions (numbered)
+        - Tips for Perfect [Name]
         """
         if self.client is None:
             print("[generate_recipe] Groq client not initialized. Check GROQ_API_KEY.")
             return ""
 
-        # Determine source if not explicitly provided
-        if source is None:
-            # Try PDF first
-            try:
-                from jema.services.pdf_recipe_store import get_pdf_store
-                pdf_store = get_pdf_store()
-                pdf_recipe = pdf_store.lookup_compound(recipe_name)
-                if not pdf_recipe:
-                    pdf_recipe = pdf_store.lookup(recipe_name)
-                
-                # Validate that the returned recipe actually matches the requested name
-                if pdf_recipe:
-                    returned_name = str(pdf_recipe.get("name", pdf_recipe.get('meal_name', ''))).strip().lower()
-                    query_lower = recipe_name.strip().lower()
-                    
-                    # Calculate name similarity
-                    name_similarity = difflib.SequenceMatcher(None, query_lower, returned_name).ratio()
-                    
-                    # Reject if too different (less than 50% similar)
-                    if name_similarity < 0.5:
-                        print(f"[PDF DEBUG] Rejected PDF result '{returned_name}' — too different from query '{query_lower}' (similarity: {name_similarity:.2f})")
-                        pdf_recipe = None
-                
-                if pdf_recipe and pdf_recipe.get("steps"):
-                    steps_text = "\n".join(pdf_recipe.get("steps", []))
-                    ingredients_text = pdf_recipe.get("ingredients_raw", "")
-                    grounded_context = f"Ingredients:\n{ingredients_text}\n\nSteps:\n{steps_text}"
-                    source = "PDF"
-            except Exception as e:
-                pass
-            
-            # Try Tavily/Web search if PDF failed
-            if source is None:
-                try:
-                    from jema.services.web_search_service import WebSearchService
-                    web_service = WebSearchService()
-                    if web_service.is_available():
-                        web_result = web_service.search_recipe(recipe_name)
-                        if web_result:
-                            grounded_context = web_result
-                            source = "TAVILY"
-                except Exception as e:
-                    pass
+        grounded_context = None
+        source_label = None
+        pdf_recipe = None
 
-            # Fall back to Groq generation
-            if source is None:
-                source = "GROQ"
+        # --- SOURCE 1: PDF COOKBOOK ---
+        try:
+            from jema.services.pdf_recipe_store import get_pdf_store
+            pdf_store = get_pdf_store()
 
-        # --- HANDLE CSV SOURCE WITH PASSED PARAMETERS ---
-        if source == "CSV":
-            if csv_steps and len(csv_steps) >= 1:
-                # Build numbered steps text from the list
-                steps_text = "\n".join(
-                    f"{i+1}. {step}" for i, step in enumerate(csv_steps)
-                )
+            # Check for compound meal first (e.g. Ugali Mayai = Ugali + Egg Stew)
+            pdf_recipe = pdf_store.lookup_compound(recipe_name)
+
+            # If not compound, check single recipe lookup
+            if not pdf_recipe:
+                pdf_recipe = pdf_store.lookup(recipe_name)
+
+            if pdf_recipe and pdf_recipe.get("steps"):
+                is_compound = pdf_recipe.get("is_compound", False)
+                steps_text = "\n".join(pdf_recipe.get("steps", []))
+                ingredients_text = pdf_recipe.get("ingredients_raw", "")
+                
                 grounded_context = (
-                    f"VERIFIED SOURCE: Jema CSV Database\n\n"
-                    f"Ingredients:\n{csv_ingredients}\n\n"
+                    f"VERIFIED SOURCE: African Recipes PDF Cookbook\n\n"
+                    f"Ingredients:\n{ingredients_text}\n\n"
                     f"Steps:\n{steps_text}"
                 )
-            else:
-                print("[generate_recipe] WARNING: CSV source selected but csv_steps is empty. Falling through to GROQ.")
-                source = "GROQ"
+                source_label = "PDF"
+        except Exception as e:
+            pass  # Silent fail, will try other sources
 
-        # --- BUILD UNIFIED SYSTEM PROMPT ---
-        system_prompt = """You are Jema, an African cooking assistant. Your only job is to format recipes.
+        # --- SOURCE 2: WEB SEARCH ---
+        if not grounded_context:
+            try:
+                from jema.services.web_search_service import WebSearchService
+                web_service = WebSearchService()
+                if web_service.is_available():
+                    web_result = web_service.search_recipe(recipe_name)
+                    if web_result:
+                        grounded_context = f"VERIFIED SOURCE: Web Search (Trusted African Cooking Sites)\n\n{web_result}"
+                        source_label = "TAVILY"
+            except Exception as e:
+                pass  # Silent fail, will try Groq
 
-ABSOLUTE RULES — no exceptions:
-1. Never use asterisks anywhere in your response. Not in ingredients, not in tips, nowhere.
-2. Never add bullet points. Tips are plain sentences on separate lines.
-3. Never add a "Serve with:" line. It is culturally presumptuous. Remove it entirely.
-4. Never add a disclaimer, footnote, or note saying the recipe is AI-generated or unverified.
-5. Never invent ingredients. If a source provides the ingredients, use only those.
-6. Never invent steps. If a source provides the steps, use only those.
-7. Never invent cultural facts, origin stories, or translations you are not certain about.
-8. If you do not know something, omit it rather than guessing.
-9. Skip ingredient categories that have no value, no amount, or "none" — do not write "none", do not write the label.
-10. Step titles must be descriptive actions: "Measure Flour", "Knead Dough", "Heat Pan" — never "Step 1" or generic labels."""
+        # --- SOURCE 3: GROQ STANDALONE (flagged) ---
+        if not grounded_context:
+            source_label = "GROQ"
 
-        # Helper function to build personalization instruction from user profile
-        def build_personalization_instruction(user_profile: dict) -> str:
-            """Build personalization rules based on user's dietary preferences from onboarding."""
-            if not user_profile:
-                return ""
-            
-            instructions = []
-            
-            # Allergies
-            allergies = user_profile.get('allergies', '').strip()
-            if allergies:
-                allergies_list = [a.strip() for a in allergies.split(',') if a.strip()]
-                instructions.append(f"ALLERGIES: User cannot eat: {', '.join(allergies_list)}. Do NOT include these ingredients. If they are in the base recipe, suggest appropriate substitutes.")
-            
-            # Medical restrictions
-            restrictions = user_profile.get('medical_restrictions', '').strip()
-            if restrictions:
-                instructions.append(f"MEDICAL RESTRICTIONS: {restrictions}. Adapt the recipe accordingly.")
-            
-            # Dislikes
-            dislikes = user_profile.get('dislikes', '').strip()
-            if dislikes:
-                dislikes_list = [d.strip() for d in dislikes.split(',') if d.strip()]
-                instructions.append(f"DISLIKES: User dislikes: {', '.join(dislikes_list)}. Try to avoid or suggest alternatives.")
-            
-            # Diet type (vegan, vegetarian, etc.)
-            diet = user_profile.get('diet', '').strip()
-            if diet and diet.lower() not in ('none', 'no preference', 'omnivore'):
-                diet_lower = diet.lower()
-                if 'vegan' in diet_lower:
-                    instructions.append("USER DIET: Vegan. Replace all animal products with plant-based alternatives.")
-                elif 'vegetarian' in diet_lower:
-                    instructions.append("USER DIET: Vegetarian. Remove or replace meat/fish with vegetarian alternatives.")
-                elif 'halal' in diet_lower:
-                    instructions.append("USER DIET: Halal. Use only halal-certified ingredients and preparation methods.")
-                else:
-                    instructions.append(f"USER DIET: {diet}. Adapt recipe accordingly.")
-            
-            # Cooking skill level (can affect complexity of instructions)
-            cooking_skills = user_profile.get('cooking_skills', '').strip()
-            if cooking_skills and cooking_skills.lower() not in ('none', 'intermediate'):
-                if cooking_skills.lower() == 'beginner':
-                    instructions.append("COOKING SKILL: Beginner. Use simple, clear instructions. Avoid advanced techniques.")
-                elif cooking_skills.lower() == 'advanced':
-                    instructions.append("COOKING SKILL: Advanced cook. You can assume familiarity with advanced techniques.")
-            
-            return "\n".join(instructions)
-        
-        personalization = build_personalization_instruction(user_profile)
+        # --- BUILD SYSTEM PROMPT ---
+        system_prompt = f"""You are Jema, a friendly African cooking assistant. Format every recipe EXACTLY like this:
 
-        # --- BUILD SOURCE-SPECIFIC USER PROMPTS ---
-        if source == "CSV":
-            # Build variant instruction if modifier present
-            variant_instruction = ""
-            if variant_modifier:
-                variant_instruction = f"\n\nIMPORTANT: The user has requested the {variant_modifier.upper()} version of this recipe. Replace the primary protein with {variant_modifier} throughout the ingredients and steps. Adjust cooking times and methods appropriately for {variant_modifier}. Do not use the original meat protein."
-            
-            # Build personalization instruction
-            personalization_section = ""
-            if personalization:
-                personalization_section = f"\n\nPERSONALIZATION RULES:\n{personalization}"
-            
-            user_prompt = f"""You are formatting a recipe from the Jema CSV database into a specific structure.
-The ingredients and steps below are the ONLY source of truth. Do not add, remove, or change any content.
-Do not generate your own recipe. Do not guess. Use only what is provided below.{variant_instruction}{personalization_section}
+[Introduction paragraph - 2-3 sentences about the dish, its origin, and significance]
 
-CRITICAL: Do not use any markdown formatting anywhere in your response. Do not wrap step titles in double asterisks like **Title**. Write step titles in plain text followed by a colon only. Correct: "1. Prepare the Dough: Mix flour and water." Wrong: "1. **Prepare the Dough**: Mix flour and water." This rule applies to every single step without exception.
+Cuisine: [Country or Region]
+
+Essential Ingredients
+
+* Starch: [ingredient with amount, or none]
+* Protein: [ingredient with amount, or none]
+* Aromatics: [ingredient with amount, or none]
+* Vegetables: [ingredient with amount, or none]
+* Spices: [ingredient with amount, or none]
+* Fat: [ingredient with amount, or none]
+* Optional: [ingredient with amount, or none]
+
+Step-by-Step Cooking Instructions
+
+1. [Specific descriptive title]: [Clear instruction]
+2. [Specific descriptive title]: [Clear instruction]
+3. [Specific descriptive title]: [Clear instruction]
+(Continue for 4-6 steps. Use descriptive titles like "Toast Spices", "Simmer Sauce", never just "Step 1")
+
+Tips for Perfect {recipe_name}
+
+* [Practical tip]
+* [Practical tip]
+* Serve with: [specific serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!"""
+
+        # --- BUILD USER PROMPT ---
+        if source_label == "PDF":
+            # PDF: Use ONLY the verified steps, no invention or expansion
+            user_prompt = f"""You are formatting a recipe from a verified African cookbook into this EXACT structure:
+
+[Introduction paragraph]
+
+Cuisine: [Country]
+
+Essential Ingredients
+
+* Starch: [ingredient with amount]
+* Protein: [ingredient with amount]
+* Aromatics: [ingredient with amount]
+* Vegetables: [ingredient with amount]
+* Spices: [ingredient with amount]
+* Fat: [ingredient with amount]
+* Optional: [ingredient with amount]
+
+Step-by-Step Cooking Instructions
+
+1. [Descriptive Title]: [Clear instruction]
+2. [Descriptive Title]: [Clear instruction]
+(Continue for all steps with descriptive titles like "Toast Spices", "Simmer Sauce", NOT "Step 1", "Step 2")
+
+Tips for Perfect {recipe_name}
+
+* [Practical tip]
+* [Practical tip]
+* Serve with: [serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!
 
 Recipe Name: {recipe_name}
-Cuisine Region: {cuisine_region if cuisine_region else "East Africa"}
+Cuisine Region: {cuisine_region or "East Africa"}
 Language: {language}
 
 {grounded_context}
 
-FORMAT INSTRUCTIONS:
-1. Write a 2-3 sentence introduction about the dish and its origin. No asterisks. Plain prose only.
-2. Write: Cuisine: {cuisine_region if cuisine_region else "East Africa"}
-3. Write: Essential Ingredients
-4. List only ingredient categories that have actual values. Use these exact labels:
-   Starch, Protein, Aromatics, Vegetables, Spices, Fat, Optional
-   Skip any category with no ingredient. Do not write "none". No asterisks. Plain lines.
-   Never list water as an ingredient — water is a cooking medium.
-   Only include a category line if it has a real ingredient value after the colon.
-5. Write: Step-by-Step Cooking Instructions
-6. Take the numbered steps provided above and format each one with a descriptive title.
-   Example: "1. Wash Ingredients: Wash the dehulled maize and pigeon peas until the water runs clear."
-   Use titles like "Wash Ingredients", "Boil Maize and Peas", "Build the Sauce", "Simmer and Garnish".
-   Do not merge steps. Do not drop steps. Do not add steps not in the source.
-   No asterisks.
-7. Write: Tips for Perfect {recipe_name}
-8. Write exactly 2 practical tips as plain sentences. No asterisks. No dashes. No "Serve with:" line.
-9. End with exactly this line:
-   Let me know if you need any clarification on any step, or if you'd like to try something else!
-"""
+INSTRUCTIONS:
+- Use ONLY the ingredients and steps from the source above
+- DO NOT add, remove, or change any steps
+- DO NOT invent ingredients not in the source
+- Organize ingredients into the category structure
+- Use descriptive step titles (Toast Spices, Simmer Sauce, etc.) not generic "Step 1"
+- Keep the original instructions intact but format for clarity
+- Follow the exact format shown above"""
 
-        elif source == "PDF":
-            user_prompt = f"""You are formatting a recipe from a verified African cookbook. The steps and ingredients below are correct. Do not add or remove content. Format only.
+        elif source_label == "TAVILY":
+            # Web: Expand into clear, actionable instructions
+            user_prompt = f"""You are formatting a recipe from a web search result into this EXACT structure:
+
+[Introduction paragraph]
+
+Cuisine: [Country]
+
+Essential Ingredients
+
+* Starch: [ingredient with amount]
+* Protein: [ingredient with amount]
+* Aromatics: [ingredient with amount]
+* Vegetables: [ingredient with amount]
+* Spices: [ingredient with amount]
+* Fat: [ingredient with amount]
+* Optional: [ingredient with amount]
+
+Step-by-Step Cooking Instructions
+
+1. [Descriptive Title]: [Clear instruction]
+2. [Descriptive Title]: [Clear instruction]
+(Continue for all steps with descriptive titles like "Toast Spices", "Simmer Sauce", NOT generic steps)
+
+Tips for Perfect {recipe_name}
+
+* [Practical tip]
+* [Practical tip]
+* Serve with: [serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!
 
 Recipe Name: {recipe_name}
-Cuisine Region: {cuisine_region if cuisine_region else "East Africa"}
+Cuisine Region: {cuisine_region or "East Africa"}
 Language: {language}
 
 {grounded_context}
 
-INGREDIENT FORMAT RULES:
-- List only ingredient categories that have actual ingredients.
-- Do not write "none", do not write the label at all if the category is empty.
-- Never list water as an ingredient — water is a cooking medium.
-- Only include a category line if it has a real ingredient value after the colon.
-- Use these exact category labels: Starch, Protein, Aromatics, Vegetables, Spices, Fat, Optional
-- No asterisks. No bullet points. Plain lines only.
+INSTRUCTIONS:
+- Use the ingredients and steps from the source above
+- You may expand vague steps into clearer, more detailed instructions
+- Organize ingredients into the category structure
+- Use descriptive step titles (Toast Spices, Simmer Sauce, etc.) not generic "Step 1"
+- Keep all original ingredients and steps but make instructions more actionable
+- Follow the exact format shown above"""
 
-FORMAT RULES:
-- Write a 2-3 sentence introduction about the dish. No asterisks.
-- Write "Cuisine: {cuisine_region if cuisine_region else "East Africa"}"
-- Write "Essential Ingredients" as a section header
-- Write "Step-by-Step Cooking Instructions" as a section header
-- Number every step with a descriptive title. No asterisks.
-- Write "Tips for Perfect {recipe_name}" as a section header
-- Write 2 practical tips as plain sentences. No asterisks. No dashes. No "Serve with:" line.
-- End with: Let me know if you need any clarification on any step, or if you'd like to try something else!"""
+        else:  # source_label == "GROQ"
+            # Generate: Create a complete authentic recipe from scratch
+            user_prompt = f"""Generate a complete authentic African recipe from scratch using this EXACT format:
 
-        elif source == "TAVILY":
-            user_prompt = f"""You are formatting a recipe found on a trusted African cooking website. Use the ingredients and steps from the source. You may expand vague steps into clearer instructions but do not invent new ingredients.
+[Introduction paragraph - 2-3 sentences about the dish and its origin]
 
-Recipe Name: {recipe_name}
-Cuisine Region: {cuisine_region if cuisine_region else "East Africa"}
+Cuisine: {cuisine_region or "East Africa"}
+
+Essential Ingredients
+
+* Starch: [ingredient with amount]
+* Protein: [ingredient with amount]
+* Aromatics: [ingredient with amount]
+* Vegetables: [ingredient with amount]
+* Spices: [ingredient with amount]
+* Fat: [ingredient with amount]
+* Optional: [ingredient with amount]
+
+Step-by-Step Cooking Instructions
+
+1. [Descriptive Title]: [Clear instruction]
+2. [Descriptive Title]: [Clear instruction]
+3. [Descriptive Title]: [Clear instruction]
+(Continue for 4-6 steps with descriptive titles like "Toast Spices", "Simmer Sauce", "Add Vegetables" - NOT "Step 1", "Step 2")
+
+Tips for Perfect {recipe_name}
+
+* [Practical, authentic tip]
+* [Practical, authentic tip]
+* Serve with: [specific serving suggestion]
+
+Let me know if you need any clarification on any step, or if you'd like to try something else!
+
+Recipe: {recipe_name}
 Language: {language}
 
-{grounded_context}
-
-INGREDIENT FORMAT RULES:
-- List only ingredient categories that have actual ingredients.
-- Do not write "none", do not write the label at all if the category is empty.
-- Never list water as an ingredient — water is a cooking medium.
-- Only include a category line if it has a real ingredient value after the colon.
-- Use these exact category labels: Starch, Protein, Aromatics, Vegetables, Spices, Fat, Optional
-- No asterisks. No bullet points. Plain lines only.
-
-FORMAT RULES:
-- Write a 2-3 sentence introduction about the dish. No asterisks.
-- Write "Cuisine: {cuisine_region if cuisine_region else "East Africa"}"
-- Write "Essential Ingredients" as a section header
-- Write "Step-by-Step Cooking Instructions" as a section header
-- Number every step with a descriptive title. No asterisks.
-- Write "Tips for Perfect {recipe_name}" as a section header
-- Write 2 practical tips as plain sentences. No asterisks. No dashes. No "Serve with:" line.
-- End with: Let me know if you need any clarification on any step, or if you'd like to try something else!"""
-
-        elif source == "CSV_COMPOUND" and compound_data:
-            c1_name = compound_data["component_1_name"]
-            c1_ingredients = compound_data["component_1_ingredients"]
-            c1_steps_raw = compound_data["component_1_steps"]
-            c2_name = compound_data["component_2_name"]
-            c2_ingredients = compound_data["component_2_ingredients"]
-            c2_steps_raw = compound_data["component_2_steps"]
-
-            c1_steps = split_steps_paragraph(c1_steps_raw)
-            c2_steps = split_steps_paragraph(c2_steps_raw)
-
-            c1_steps_text = "\n".join(f"{i+1}. {s}" for i, s in enumerate(c1_steps))
-            c2_steps_text = "\n".join(f"{i+1}. {s}" for i, s in enumerate(c2_steps))
-
-            grounded_context = (
-                f"COMPOUND MEAL: {recipe_name}\n"
-                f"This dish is made of two components prepared separately and served together.\n\n"
-                f"COMPONENT 1: {c1_name}\n"
-                f"Ingredients: {c1_ingredients}\n"
-                f"Steps:\n{c1_steps_text}\n\n"
-                f"COMPONENT 2: {c2_name}\n"
-                f"Ingredients: {c2_ingredients}\n"
-                f"Steps:\n{c2_steps_text}"
-            )
-            source_label = "CSV_COMPOUND"
-            
-            user_prompt = f"""You are formatting a compound African meal recipe. This dish consists of two components that are prepared separately and served together. Both components are from the Jema CSV database and their steps are correct and authoritative. Do not add, remove, or change any content. Format only.
-
-Recipe Name: {recipe_name}
-Language: {language}
-
-{grounded_context}
-
-FORMAT INSTRUCTIONS:
-1. Write a 2-3 sentence introduction explaining that {recipe_name} is a complete meal made of two components: {compound_data['component_1_name']} and {compound_data['component_2_name']}. No asterisks.
-2. Write: Cuisine: {cuisine_region or "East Africa"}
-3. Write: Component 1: {compound_data['component_1_name']}
-4. Write: Essential Ingredients
-5. List only ingredient categories that have actual values for {compound_data['component_1_name']}. Use labels: Starch, Protein, Aromatics, Vegetables, Spices, Fat, Optional. Skip empty categories. No asterisks. Plain lines.
-6. Write: Step-by-Step Cooking Instructions
-7. Number every step of {compound_data['component_1_name']} with a descriptive title. No asterisks. No bold markdown.
-8. Write: Component 2: {compound_data['component_2_name']}
-9. Write: Essential Ingredients
-10. List only ingredient categories that have actual values for {compound_data['component_2_name']}. Same rules as above.
-11. Write: Step-by-Step Cooking Instructions
-12. Number every step of {compound_data['component_2_name']} with a descriptive title. No asterisks. No bold markdown.
-13. Write: Tips for Perfect {recipe_name}
-14. Write exactly 2 practical tips covering both components as plain sentences. No asterisks. No dashes. No "Serve with:" line.
-15. End with exactly: Let me know if you need any clarification on any step, or if you'd like to try something else!
-"""
-
-        else:  # source == "GROQ"
-            user_prompt = f"""Generate a complete authentic African recipe for {recipe_name}. Only include information you are certain about. If you are not certain about an ingredient or step, omit it rather than guessing.
-
-Recipe Name: {recipe_name}
-Cuisine Region: {cuisine_region if cuisine_region else "East Africa"}
-Language: {language}
-
-INGREDIENT FORMAT RULES:
-- List only ingredient categories that have actual ingredients.
-- Do not write "none", do not write the label at all if the category is empty.
-- Never list water as an ingredient — water is a cooking medium.
-- Only include a category line if it has a real ingredient value after the colon.
-- Use these exact category labels: Starch, Protein, Aromatics, Vegetables, Spices, Fat, Optional
-- No asterisks. No bullet points. Plain lines only.
-- Only real ingredients that belong to this dish.
-
-FORMAT RULES:
-- Write a 2-3 sentence factual introduction about the dish and its origin. Omit any cultural fact you are not certain about. No asterisks.
-- Write "Cuisine: {cuisine_region if cuisine_region else "East Africa"}"
-- Write "Essential Ingredients" as a section header
-- Write "Step-by-Step Cooking Instructions" as a section header
-- Number every step with a descriptive title. No asterisks. Only real steps for this dish.
-- Write "Tips for Perfect {recipe_name}" as a section header
-- Write 2 practical tips as plain sentences. No asterisks. No dashes. No "Serve with:" line.
-- End with: Let me know if you need any clarification on any step, or if you'd like to try something else!
-- If you genuinely do not know this dish, respond only with: "I don't have reliable information about this dish. Please search for {recipe_name} on a trusted African recipe site." """
+Make it authentic, practical, and easy to follow. Use only real, chef-verified tips (no hallucinated tips). Include amounts for all ingredients."""
 
         # --- CALL GROQ ---
         try:
@@ -967,6 +799,7 @@ FORMAT RULES:
                 max_tokens=2000,
             )
             result = response.choices[0].message.content.strip()
+
             return result
 
         except Exception as e:
@@ -1134,8 +967,6 @@ FORMAT RULES:
                     cleaned = re.sub(r'\*\*', '', cleaned).strip()
                     # Remove trailing instruction text in parentheses (IMPORTANT:, Note:, etc.)
                     cleaned = re.sub(r'\s*[\(\[]?(IMPORTANT|NOTE|Note|Important):[^\)]*[\)\]]?\s*$', '', cleaned, flags=re.IGNORECASE).strip()
-                    # FIX 1: Additional cleanup for all asterisks before appending
-                    cleaned = cleaned.replace("**", "").replace("*", "").strip()
                     if cleaned and len(cleaned) > 5:
                         steps.append(cleaned)
                 elif steps and line and not line.startswith(("*", "-")):
@@ -1175,17 +1006,8 @@ FORMAT RULES:
         cleaned_ingredients = []
         for ing in ingredients:
             cleaned = clean_text(ing)
-            if not cleaned:
-                continue
-            if cleaned.endswith(":"):
-                continue
-            # Skip lines where the value is none, n/a, dash, or empty
-            if ":" in cleaned:
-                value = cleaned.split(":", 1)[1].strip().lower()
-                # Check for empty or whitespace-only values
-                if value in ("none", "n/a", "-", "", "–") or len(value) == 0 or not value.strip():
-                    continue
-            if len(cleaned) > 2:
+            # Don't include lines that are just category labels with no content
+            if cleaned and not cleaned.endswith(":") and len(cleaned) > 2:
                 cleaned_ingredients.append(cleaned)
         
         cleaned_steps = [clean_text(step) for step in steps]

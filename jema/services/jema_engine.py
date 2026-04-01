@@ -7,7 +7,6 @@ This is the only class that API views should call.
 import os
 import re
 import random
-import difflib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -114,41 +113,6 @@ COMMON_RECIPES = {
 }
 
 
-def split_steps_paragraph(paragraph: str) -> list:
-    if not paragraph or not paragraph.strip():
-        return []
-
-    # Normalize all line endings first
-    paragraph = paragraph.replace('\r\n', '\n').replace('\r', '\n')
-
-    # Remove leading method/steps prefix e.g. "Method: Boil\nSteps:" or "Steps:"
-    paragraph = re.sub(r'^(Method:[^\n]*\n)?Steps?:\s*', '', paragraph.strip(), flags=re.IGNORECASE)
-
-    # Strategy 1: Newline-separated steps (Title: content\nTitle: content)
-    # Each non-empty line is its own step
-    lines = [line.strip() for line in paragraph.split('\n') if line.strip() and len(line.strip()) > 5]
-    if len(lines) >= 3:
-        return lines
-
-    # Strategy 2: Paragraph with action-header pattern (Title: content. Title: content.)
-    # Split on pattern: period or newline followed by a capitalized word and colon
-    action_splits = re.split(r'(?<=\.)\s+(?=[A-Z][a-zA-Z\s\(\)]+:)', paragraph)
-    action_steps = [s.strip() for s in action_splits if s.strip() and len(s.strip()) > 5]
-    if len(action_steps) >= 3:
-        return action_steps
-
-    # Strategy 3: Plain sentence splitting (fallback)
-    sentences = re.split(r'\.\s+', paragraph.strip())
-    steps = []
-    for s in sentences:
-        s = s.strip()
-        if s and len(s) > 5:
-            if not s.endswith('.'):
-                s = s + '.'
-            steps.append(s)
-    return steps
-
-
 class JemaEngine:
     """
     Central orchestrator for Jema conversations.
@@ -179,20 +143,6 @@ class JemaEngine:
         "rice and coconut": "wali wa nazi",
     }
 
-    def _load_user_profile(self, user) -> Optional[Dict]:
-        """
-        Load user profile context from the Profile model.
-        
-        Returns dict with user preferences for personalization, or None if not available.
-        """
-        try:
-            from profiles.services import get_user_profile_context
-            return get_user_profile_context(user)
-        except Exception as e:
-            if self.debug_mode:
-                print(f"[JemaEngine] Warning: Could not load user profile: {e}")
-            return None
-    
     def _normalize_recipe_name(self, name: str) -> str:
         """Normalize recipe name to canonical form to prevent duplicates."""
         return self.RECIPE_NAME_ALIASES.get(name.lower().strip(), name.lower().strip())
@@ -260,41 +210,34 @@ class JemaEngine:
         
         return selected
 
-    def __init__(self, excel_path: Optional[str] = None, debug_mode: bool = False, user=None):
+    def __init__(self, excel_path: Optional[str] = None, debug_mode: bool = False):
         """
         Initialize the Jema Engine.
         
         Args:
-            excel_path: Deprecated. Kept for backward compatibility.
+            excel_path: Path to Excel recipe file. Defaults to packaged data.
             debug_mode: Enable debug output for accuracy tracking.
-            user: Optional Django User object. If provided, loads user profile for personalization.
         """
-        # Use CSV as the source of truth
-        csv_path = str(JEMA_DIR / "data" / "final_african_recipes.csv")
+        # Determine Excel path
+        if excel_path is None:
+            excel_path = str(JEMA_DIR / "data" / "Jema_AI_East_Africa_Core_Meals_Phase1.xlsx")
         
-        if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"Recipe CSV not found: {csv_path}")
+        if not os.path.exists(excel_path):
+            raise FileNotFoundError(f"Recipe file not found: {excel_path}")
         
         # Load data once
-        loader = DataLoader(csv_path=csv_path)
+        loader = DataLoader(excel_path)
         data = loader.load_all()
         self.recipes_df = data.get("recipes", pd.DataFrame())
         
         if self.recipes_df.empty:
-            raise ValueError("No recipe data loaded from CSV file")
-        
-        # Log DataFrame columns for debugging CSV column mismatches
-        print(f"[JemaEngine] CSV columns available: {list(self.recipes_df.columns)}")
+            raise ValueError("No recipe data loaded from Excel file")
         
         # Initialize services
         self.matcher = ExcelRecipeMatcher(self.recipes_df)
         self.substitute_resolver = SubstituteResolver(self.recipes_df)
         self.llm = LLMService()
         self.language_detector = LanguageDetector()
-        
-        # Load user profile context for personalization
-        self.user = user
-        self.user_profile = self._load_user_profile(user) if user else None
         
         # Conversation state
         self.last_suggested_recipes: List[Dict] = []
@@ -307,201 +250,6 @@ class JemaEngine:
         
         # Regional diversity tracking (prevent repetition from same region)
         self.suggested_regions: List[str] = []  # Track regions of suggested recipes in this session
-
-    def _lookup_csv_recipe(self, recipe_name: str) -> Optional[Dict]:
-        """
-        Look up a recipe in the CSV database.
-        
-        Matching strategy:
-        1. Exact match (case-insensitive, whitespace trimmed)
-        2. Compound meal detection
-        3. Close match with guards (cutoff 0.8, length/word checks)
-        
-        Returns the recipe dict (with all CSV columns) if found, None otherwise.
-        """
-        if not recipe_name or self.recipes_df.empty:
-            return None
-        
-        query_lower = recipe_name.strip().lower()
-        meal_names = self.recipes_df['meal_name'].dropna().tolist()
-        meal_names_lower = [name.strip().lower() for name in meal_names]
-        
-        # Priority 1: Exact full name match (case-insensitive, whitespace stripped)
-        for idx, row in self.recipes_df.iterrows():
-            if str(row.get('meal_name', '')).strip().lower() == query_lower:
-                matched_row = row.to_dict()
-                print(f"[CSV DEBUG] Exact match found for '{recipe_name}'")
-                return matched_row
-        
-        # Priority 2: Compound meal detection
-        compound = self.detect_compound_meal(recipe_name, self.recipes_df)
-        if compound:
-            return compound
-        
-        # Priority 3: Close match with guards (cutoff 0.8 to prevent false positives)
-        matches = difflib.get_close_matches(
-            query_lower,
-            meal_names_lower,
-            n=1,
-            cutoff=0.8
-        )
-
-        if matches:
-            matched_lower = matches[0]
-
-            # Guard 1: Reject if matched name differs in length by more than 3 characters
-            if abs(len(matched_lower) - len(query_lower)) > 3:
-                print(f"[CSV DEBUG] Rejected close match '{matched_lower}' — length too different from '{query_lower}'")
-                return None
-
-            # Guard 2: Reject if query has more words than matched name (prevents Ugali Mayai → Ugali)
-            if len(query_lower.split()) > len(matched_lower.split()) + 1:
-                print(f"[CSV DEBUG] Rejected close match '{matched_lower}' — query has more words than match")
-                return None
-
-            # Find and return the actual row
-            original_idx = meal_names_lower.index(matched_lower)
-            matched_row = self.recipes_df.iloc[original_idx].to_dict()
-            print(f"[CSV DEBUG] Close match found for '{recipe_name}' → '{matched_lower}'")
-            return matched_row
-
-        return None
-    
-    def detect_compound_meal(self, recipe_name: str, df: pd.DataFrame) -> Optional[Dict]:
-        """
-        Check if a recipe name is a compound of two known recipes.
-        Returns a dict with is_compound flag and component data, or None.
-        """
-        query_lower = recipe_name.strip().lower()
-        meal_names_lower = [str(n).strip().lower() for n in df['meal_name'].dropna()]
-
-        words = query_lower.split()
-        if len(words) < 2:
-            return None
-
-        # Try every split point: first word(s) as component 1, rest as component 2
-        for i in range(1, len(words)):
-            part1 = " ".join(words[:i])
-            part2 = " ".join(words[i:])
-
-            match1 = difflib.get_close_matches(part1, meal_names_lower, n=1, cutoff=0.85)
-            match2 = difflib.get_close_matches(part2, meal_names_lower, n=1, cutoff=0.85)
-
-            if match1 and match2:
-                idx1 = meal_names_lower.index(match1[0])
-                idx2 = meal_names_lower.index(match2[0])
-                row1 = df.iloc[idx1]
-                row2 = df.iloc[idx2]
-                print(f"[CSV DEBUG] Compound meal detected: '{match1[0]}' + '{match2[0]}'")
-                return {
-                    "is_compound": True,
-                    "component_1_name": row1.get('meal_name', ''),
-                    "component_1_ingredients": row1.get('core_ingredients', ''),
-                    "component_1_steps": row1.get('recipes', ''),
-                    "component_2_name": row2.get('meal_name', ''),
-                    "component_2_ingredients": row2.get('core_ingredients', ''),
-                    "component_2_steps": row2.get('recipes', ''),
-                }
-
-        return None
-
-    def _csv_search_by_ingredient(self, ingredient: str, count: int) -> list:
-        """
-        Search the CSV for recipes whose core_ingredients contain the given ingredient.
-        Returns up to `count` matching recipe dicts.
-        """
-        ingredient_lower = ingredient.strip().lower()
-        matches = []
-
-        for idx, row in self.recipes_df.iterrows():
-            core = str(row.get('core_ingredients', '')).lower()
-            if ingredient_lower in core:
-                matches.append({
-                    'meal_name': row.get('meal_name', ''),
-                    'cuisine_region': row.get('cuisine_region', ''),
-                    'country': row.get('country', '')
-                })
-            if len(matches) >= count:
-                break
-
-        return matches
-
-    def _lookup_with_modifier(self, recipe_name: str) -> tuple:
-        """
-        Returns (row, modifier) where modifier is the variant requested.
-        e.g. "Fish Pepper Soup" → (pepper_soup_row, "fish")
-        
-        Returns (None, None) if no match found.
-        """
-        query_lower = recipe_name.strip().lower()
-
-        # Try exact match first
-        for idx, row in self.recipes_df.iterrows():
-            if str(row.get('meal_name', '')).strip().lower() == query_lower:
-                return row, None
-
-        # Try stripping common modifier words from the front
-        common_modifiers = [
-            'fish', 'chicken', 'beef', 'goat', 'lamb', 'vegetable',
-            'vegan', 'spicy', 'fried', 'grilled', 'smoked'
-        ]
-
-        words = query_lower.split()
-        if len(words) > 1:
-            for modifier in common_modifiers:
-                if words[0] == modifier:
-                    base_name = ' '.join(words[1:])
-                    for idx, row in self.recipes_df.iterrows():
-                        if str(row.get('meal_name', '')).strip().lower() == base_name:
-                            print(f"[CSV DEBUG] Modifier match: '{modifier}' + '{base_name}'")
-                            return row, modifier
-
-        return None, None
-
-    def _split_csv_steps_into_sentences(self, steps_text: str) -> str:
-        """
-        Split a paragraph of steps into individual sentences.
-        
-        When CSV steps arrive as a paragraph (long string without numbering),
-        split by period followed by space and return as numbered list.
-        
-        Args:
-            steps_text: Raw steps text from CSV (may be a paragraph)
-        
-        Returns:
-            Formatted text with each sentence on its own line for Groq to number and title
-        """
-        if not steps_text or not isinstance(steps_text, str):
-            return ""
-        
-        steps_text = steps_text.strip()
-        
-        # Check if already numbered (contains "1.", "2.", etc.) or bulleted
-        if any(f"{i}." in steps_text or f"{i})" in steps_text for i in range(1, 10)):
-            # Already formatted as numbered steps, return as-is
-            return steps_text
-        
-        if steps_text.startswith(("-", "•", "*")):
-            # Already bulleted, return as-is
-            return steps_text
-        
-        # Split by period followed by space
-        # Then clean and filter out empty sentences
-        sentences = [s.strip() for s in steps_text.split(". ")]
-        
-        # Reconstruct with periods and join with newlines
-        # so each sentence is on its own line for Groq to handle
-        cleaned_sentences = []
-        for sentence in sentences:
-            if not sentence:
-                continue
-            # Add period back if not present
-            if not sentence.endswith((".", "!", "?")):
-                sentence = sentence + "."
-            cleaned_sentences.append(sentence)
-        
-        # Return as newline-separated lines (Groq will see each as a step to title and number)
-        return "\n".join(cleaned_sentences)
 
     def process_message(self, user_input: str) -> Dict:
         """
@@ -861,11 +609,7 @@ class JemaEngine:
         - "Give me a recipe for chapati"
         - "How to make ugali"
 
-        Source priority:
-        1. CSV database with exact/close match — steps are authoritative
-        2. PDF recipe store
-        3. Tavily web search
-        4. Groq generation (constrained)
+        Always uses generate_recipe() which returns a fully formatted recipe string.
         """
         # Extract recipe name from the request
         recipe_name = self._extract_recipe_name(user_input)
@@ -887,102 +631,14 @@ class JemaEngine:
             )
             return self._build_response(response, [])
 
-        # ─────────────────────────────────────────────────────────────────────────────
-        # STEP 1: Try CSV lookup first (authoritative source)
-        # ─────────────────────────────────────────────────────────────────────────────
-        csv_recipe, variant_modifier = self._lookup_with_modifier(recipe_name)
-        
+        # Generate full formatted recipe using Groq
         try:
-            if csv_recipe is not None:
-                # CSV found — extract the raw ingredients and steps
-                csv_cuisine_region = csv_recipe.get("cuisine_region", "East Africa")
-                
-                # Debug: Show ALL available columns and values
-                print(f"\n[CSV DEBUG] Recipe found: {recipe_name}")
-                print(f"[CSV DEBUG] Available columns in row: {list(csv_recipe.keys())}")
-                for col, val in csv_recipe.items():
-                    if val and isinstance(val, str):
-                        preview = str(val)[:150].replace("\n", " ")
-                        print(f"[CSV DEBUG]   {col}: {preview}...")
-                
-                # Try multiple possible column names for steps and ingredients
-                csv_steps_paragraph = csv_recipe.get("recipes", "") or csv_recipe.get("steps", "") or csv_recipe.get("instructions", "") or csv_recipe.get("method", "")
-                csv_ingredients_raw = csv_recipe.get("core_ingredients", "") or csv_recipe.get("ingredients", "") or csv_recipe.get("ingredient_list", "")
-                
-                # Filter water and other cooking mediums from ingredient display
-                SKIP_INGREDIENTS = {'water', 'boiling water', 'cold water', 'hot water'}
-                ingredient_parts = [
-                    part.strip() for part in csv_ingredients_raw.split(',')
-                    if part.strip().lower() not in SKIP_INGREDIENTS
-                ]
-                csv_ingredients = ', '.join(ingredient_parts)
-                
-                print(f"[CSV DEBUG] Found steps: {len(csv_steps_paragraph)} chars")
-                print(f"[CSV DEBUG] Found ingredients: {len(csv_ingredients)} chars")
-                
-                if not csv_steps_paragraph:
-                    print(f"[CSV DEBUG] ERROR: No steps found in any column!")
-                
-                # Split paragraph steps into individual sentences
-                csv_steps = split_steps_paragraph(csv_steps_paragraph)
-                print(f"[CSV DEBUG] After split: {len(csv_steps)} individual steps")
-                
-                # FIX 3: Add full debug output for each step
-                for i, step in enumerate(csv_steps):
-                    print(f"[CSV DEBUG] Full step {i+1} ({len(step)} chars): {step}")
-                
-                # Handle compound meals
-                if csv_recipe.get("is_compound"):
-                    message = self.llm.generate_recipe(
-                        recipe_name=recipe_name,
-                        cuisine_region=csv_cuisine_region,
-                        language=self.llm.current_language,
-                        source="CSV_COMPOUND",
-                        compound_data=csv_recipe,
-                        user_profile=self.user_profile,
-                    )
-                else:
-                    # Regular CSV recipe
-                    message = self.llm.generate_recipe(
-                        recipe_name=recipe_name,
-                        cuisine_region=csv_cuisine_region,
-                        language=self.llm.current_language,
-                        source="CSV",
-                        csv_steps=csv_steps,
-                        csv_ingredients=csv_ingredients,
-                        csv_row=csv_recipe,
-                        user_profile=self.user_profile,
-                        variant_modifier=variant_modifier,
-                    )
-                
-                if message:
-                    # Store recipe data for context
-                    recipe_data = {
-                        "meal_name": recipe_name,
-                        "cuisine_region": csv_cuisine_region,
-                        "source": "CSV",
-                    }
-                    
-                    self.current_recipe = recipe_data
-                    self.recipe_confirmed = True
-                    self.last_suggested_recipes = [recipe_data]
-                    self.awaiting_recipe_choice = False
-                    
-                    self.llm.add_to_history("user", user_input)
-                    self.llm.add_to_history("assistant", message)
-                    
-                    return self._build_response(message, [recipe_data])
-            
-            # ─────────────────────────────────────────────────────────────────────────
-            # STEP 2: CSV miss — try PDF, Tavily, then Groq (handled in generate_recipe)
-            # ─────────────────────────────────────────────────────────────────────────
-            message = self.llm.generate_recipe(
-                recipe_name, 
-                cuisine_region="East Africa",
-                user_profile=self.user_profile
-            )
+            message = self.llm.generate_recipe(recipe_name, cuisine_region="East Africa")
             
             if message:
+                # Add closing statement and update history
+                message += "\n\nLet me know if you need any clarification on any step, or if you'd like to try something else!"
+                
                 # Store recipe data for context
                 recipe_data = {
                     "meal_name": recipe_name,
@@ -1038,74 +694,35 @@ class JemaEngine:
         if not any(term in user_input.lower() for term in beverage_terms):
             active_matcher = active_matcher.exclude_beverages()
         
-        # STEP 0: Try direct CSV ingredient search first for primary ingredients
-        # This ensures recipes containing the requested ingredient are found directly
+        # STEP 1: Get CSV results
+        matches = active_matcher.match(
+            user_ingredients=user_ingredients,
+            user_constraints=user_constraints,
+            min_match_percentage=0.4
+        )
+        
+        # Exclude rejected recipes
+        if self.rejected_recipes:
+            matches = [m for m in matches if m.name not in self.rejected_recipes]
+        
+        # Normalize ingredients for matching
         normalized_ingredients = [ing.lower().strip() for ing in user_ingredients]
+        
+        # Get raw CSV results — convert to dicts immediately
         raw_csv_results = []
-        
-        # Search each primary ingredient for direct matches
-        PRIMARY_INGREDIENTS = {
-            "eggs", "egg", "beef", "chicken", "kuku", "fish", "samaki",
-            "lamb", "goat", "pork", "meat", "nyama", "shrimp", "prawns",
-            "beans", "maharagwe", "lentils", "ndengu", "peas", "chickpeas",
-            "groundnuts", "groundnut", "peanut", "peanuts",
-            "rice", "mchele", "wali", "potato", "viazi", "maize", "mahindi",
-            "banana", "ndizi", "plantain", "cassava", "mihogo", "ugali",
-            "flour", "chapati", "spinach", "kale", "sukuma", "cabbage"
-        }
-        
-        # Try direct search for primary ingredients first
-        for ingredient in normalized_ingredients:
-            if ingredient in PRIMARY_INGREDIENTS:
-                direct_matches = self._csv_search_by_ingredient(ingredient, count=10)
-                for match in direct_matches:
-                    # Fetch full recipe row from CSV
-                    recipe_row = self.recipes_df[self.recipes_df['meal_name'] == match['meal_name']]
-                    if not recipe_row.empty:
-                        row = recipe_row.iloc[0]
-                        full_recipe = {
-                            "meal_name": str(row.get("meal_name", "") if hasattr(row, 'get') else row["meal_name"]),
-                            "cuisine_region": str(row.get("cuisine_region", "") if hasattr(row, 'get') else row["cuisine_region"]),
-                            "core_ingredients": str(row.get("core_ingredients", "") if hasattr(row, 'get') else row["core_ingredients"]),
-                            "recipe": str(row.get("recipes", "") if hasattr(row, 'get') else row.get("recipes", "")),
-                            "cook_time_minutes": row.get("cook_time_minutes", 0) if hasattr(row, 'get') else 0,
-                            "notes": str(row.get("notes", "") if hasattr(row, 'get') else ""),
-                            "country": str(row.get("country", "") if hasattr(row, 'get') else ""),
-                        }
-                        # Only add if not already in results
-                        if not any(r['meal_name'] == full_recipe['meal_name'] for r in raw_csv_results):
-                            raw_csv_results.append(full_recipe)
-        
-        # If direct search didn't find enough, fall back to matcher
-        if len(raw_csv_results) < 3:
-            # STEP 1: Get CSV results via matcher (fallback)
-            matches = active_matcher.match(
-                user_ingredients=user_ingredients,
-                user_constraints=user_constraints,
-                min_match_percentage=0.4
-            )
-            
-            # Exclude rejected recipes
-            if self.rejected_recipes:
-                matches = [m for m in matches if m.name not in self.rejected_recipes]
-            
-            # Get raw CSV results — convert to dicts immediately
-            for match in matches:
-                recipe_row = self.recipes_df[self.recipes_df['meal_name'] == match.name]
-                if not recipe_row.empty:
-                    row = recipe_row.iloc[0]
-                    full_recipe = {
-                        "meal_name": str(row.get("meal_name", "") if hasattr(row, 'get') else row["meal_name"]),
-                        "cuisine_region": str(row.get("cuisine_region", "") if hasattr(row, 'get') else row["cuisine_region"]),
-                        "core_ingredients": str(row.get("core_ingredients", "") if hasattr(row, 'get') else row["core_ingredients"]),
-                        "recipe": str(row.get("recipes", "") if hasattr(row, 'get') else row.get("recipes", "")),
-                        "cook_time_minutes": row.get("cook_time_minutes", 0) if hasattr(row, 'get') else 0,
-                        "notes": str(row.get("notes", "") if hasattr(row, 'get') else ""),
-                        "country": str(row.get("country", "") if hasattr(row, 'get') else ""),
-                    }
-                    # Only add if not already in results
-                    if not any(r['meal_name'] == full_recipe['meal_name'] for r in raw_csv_results):
-                        raw_csv_results.append(full_recipe)
+        for match in matches:
+            recipe_row = self.recipes_df[self.recipes_df['meal_name'] == match.name]
+            if not recipe_row.empty:
+                row = recipe_row.iloc[0]
+                raw_csv_results.append({
+                    "meal_name": str(row.get("meal_name", "") if hasattr(row, 'get') else row["meal_name"]),
+                    "cuisine_region": str(row.get("cuisine_region", "") if hasattr(row, 'get') else row["cuisine_region"]),
+                    "core_ingredients": str(row.get("core_ingredients", "") if hasattr(row, 'get') else row["core_ingredients"]),
+                    "recipe": str(row.get("recipes", "") if hasattr(row, 'get') else row.get("recipes", "")),
+                    "cook_time_minutes": row.get("cook_time_minutes", 0) if hasattr(row, 'get') else 0,
+                    "notes": str(row.get("notes", "") if hasattr(row, 'get') else ""),
+                    "country": str(row.get("country", "") if hasattr(row, 'get') else ""),
+                })
         
         # ── STEP 1: Include all African recipes from CSV (no regional filtering) ──────────────────────────
         # All African cuisines are welcome, so we use all results
@@ -1259,7 +876,7 @@ class JemaEngine:
                     {"meal_name": "Sukuma Wiki","cuisine_region": "Kenya"},
                     {"meal_name": "Githeri",   "cuisine_region": "Kenya"},
                 ]),
-            ] 
+            ]
 
             for ingredient_set, defaults in INGREDIENT_DEFAULTS:
                 if ingredient_set.issubset(normalized_set_lower):
