@@ -83,7 +83,6 @@ class Profile(models.Model):
     email = models.EmailField(blank=True)
     gender = models.CharField(max_length=50, blank=True)
     dob = models.DateField(null=True, blank=True)
-    location = models.CharField(max_length=255, blank=True)
 
     # -----------------------------
     # HEALTH METRICS
@@ -91,7 +90,6 @@ class Profile(models.Model):
     current_weight_kg = models.FloatField(null=True, blank=True)
     current_height_cm = models.FloatField(null=True, blank=True)
     target_weight_kg = models.FloatField(null=True, blank=True)
-    target_height_cm = models.FloatField(null=True, blank=True)
     goal = models.CharField(max_length=100, blank=True)
     activity_level = models.CharField(max_length=50, blank=True)
     eating_realities = models.TextField(blank=True)
@@ -105,9 +103,6 @@ class Profile(models.Model):
     # -----------------------------
     diet = models.CharField(max_length=100, blank=True)
     religion = models.CharField(max_length=100, blank=True)
-    occupational_status = models.CharField(max_length=100, blank=True)
-    works_at = models.CharField(max_length=255, blank=True)
-    income_level = models.CharField(max_length=100, blank=True)
     region = models.CharField(max_length=100, blank=True)
 
     # -----------------------------
@@ -225,12 +220,23 @@ class Profile(models.Model):
 
 
 class Referral(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_VERIFIED = "verified"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_VERIFIED, "Verified"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
     referrer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="referrals_made"
     )
     referred_user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="referrals_received"
     )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_VERIFIED)
+    reward_granted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

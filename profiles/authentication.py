@@ -16,6 +16,21 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def _extract_signup_referral_code(payload: dict) -> str:
+    metadata = payload.get("user_metadata") or payload.get("raw_user_meta_data") or {}
+    code = (metadata.get("referred_by") or metadata.get("referral_code") or "").strip().upper()
+
+    if not code:
+        return ""
+
+    # Profile.referral_code/referred_by are max_length=12.
+    if len(code) > 12:
+        logger.warning("referral.auth_metadata_invalid_length user_id=%s len=%s", payload.get("sub"), len(code))
+        return ""
+
+    return code
+
+
 class SupabaseAuthentication(authentication.BaseAuthentication):
     """
     Supabase JWT authentication using JWKS (no API calls to user DB)
@@ -105,7 +120,9 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         """
         uid = payload["sub"]
         email = payload.get("email", "").lower()
-        full_name = payload.get("user_metadata", {}).get("full_name", "")
+        metadata = payload.get("user_metadata") or payload.get("raw_user_meta_data") or {}
+        full_name = metadata.get("full_name", "")
+        referred_by_code = _extract_signup_referral_code(payload)
 
         # Try to find by UID first
         user = User.objects.filter(id=uid).first()
@@ -140,10 +157,40 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
 
         # Ensure Profile exists
         from profiles.models import Profile
-        Profile.objects.get_or_create(
+        profile, _ = Profile.objects.get_or_create(
             user=user,
             defaults={"name": full_name, "email": email},
         )
+
+        # Apply signup-time referral metadata during first authenticated bootstrap.
+        if referred_by_code and not profile.referred_by:
+            try:
+                from profiles.views import _process_referred_by
+                _process_referred_by(user, profile, referred_by_code)
+            except Exception:
+                logger.exception("referral.auth_apply_failed user_id=%s", user.id)
+
+        # Reconcile missed reward processing for existing referrals. This is
+        # idempotent and only runs for rows not yet marked reward_granted.
+        if referred_by_code:
+            try:
+                from profiles.models import Referral
+                pending_referral = (
+                    Referral.objects
+                    .select_related("referrer")
+                    .filter(referred_user=user, reward_granted=False)
+                    .first()
+                )
+                if pending_referral:
+                    from profiles.views import _apply_referral_rewards
+                    transaction.on_commit(
+                        lambda: _apply_referral_rewards(
+                            pending_referral.pk,
+                            pending_referral.referrer_id,
+                        )
+                    )
+            except Exception:
+                logger.exception("referral.auth_reconcile_failed user_id=%s", user.id)
 
         # Ensure PoaPointsAccount exists
         from rewards.models.wallet import PoaPointsAccount

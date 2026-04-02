@@ -1,11 +1,9 @@
 PROFILE_COMPLETION_FIELDS = [
     "gender",
     "dob",
-    "location",
     "current_weight_kg",
     "current_height_cm",
     "target_weight_kg",
-    "target_height_cm",
     "goal",
     "activity_level",
     "eating_realities",
@@ -14,6 +12,5 @@ PROFILE_COMPLETION_FIELDS = [
     "cooking_skills",
     "diet",
     "religion",
-    "occupational_status",
     "region",
 ]

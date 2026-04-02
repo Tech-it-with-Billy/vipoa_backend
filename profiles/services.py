@@ -55,7 +55,6 @@ def get_user_profile_context(user) -> Dict[str, Any]:
         "current_weight_kg": profile.current_weight_kg,
         "current_height_cm": profile.current_height_cm,
         "target_weight_kg": profile.target_weight_kg,
-        "target_height_cm": profile.target_height_cm,
         "bmi": profile.bmi,
         "bmi_category": profile.bmi_category,
         "bmr": profile.bmr,
@@ -81,6 +80,5 @@ def get_user_profile_context(user) -> Dict[str, Any]:
         # LIFESTYLE
         # -----------------------------
         "religion": profile.religion or "",
-        "income_level": profile.income_level or "",
 
     }
