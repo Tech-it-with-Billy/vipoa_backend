@@ -1259,7 +1259,7 @@ class JemaEngine:
                     {"meal_name": "Sukuma Wiki","cuisine_region": "Kenya"},
                     {"meal_name": "Githeri",   "cuisine_region": "Kenya"},
                 ]),
-            ] 
+            ]
 
             for ingredient_set, defaults in INGREDIENT_DEFAULTS:
                 if ingredient_set.issubset(normalized_set_lower):

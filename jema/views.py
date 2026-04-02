@@ -69,12 +69,12 @@ def get_engine():
     return _engine
 
 def get_session_engine(session_id: int, user=None):
-    \"\"\"Get or create a per-session engine instance for state isolation.
+    """Get or create a per-session engine instance for state isolation.
     
     Args:
         session_id: The chat session ID
         user: Optional Django User object for personalization
-    \"\"\"
+    """
     if session_id not in _session_engines:
         try:
             _session_engines[session_id] = JemaEngine(user=user)
@@ -125,9 +125,12 @@ def chat(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Fetch user for personalization (optional)
+        # Resolve user for personalization/rewards.
+        # Prefer authenticated request user; fallback to payload user_id for legacy clients.
         user = None
-        if user_id:
+        if getattr(request.user, 'is_authenticated', False):
+            user = request.user
+        elif user_id:
             try:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
@@ -135,26 +138,53 @@ def chat(request):
             except Exception as e:
                 logger.debug(f"Could not fetch user {user_id}: {e}")
                 user = None
-        
-        # Get session-specific engine for state isolation
+
+        # Resolve or create session so user messages are persisted server-side.
+        # This allows post_save(ChatMessage) reward signals to run consistently.
+        session = None
         if session_id:
             try:
-                session_id_int = int(session_id)
-                engine = get_session_engine(session_id_int, user=user)
-            except (ValueError, TypeError):
-                # Invalid session_id, use global engine
-                engine = get_engine()
-        else:
-            # No session, use global engine
-            engine = get_engine()
+                session = ChatSession.objects.get(id=int(session_id))
+            except (ValueError, TypeError, ChatSession.DoesNotExist):
+                logger.warning(f"ChatSession {session_id} not found or invalid")
+
+        if user and session and session.user_id and session.user_id != str(user.id):
+            # Prevent cross-user session usage by rebinding to a new session.
+            try:
+                session = ChatSession.objects.create(user_id=str(user.id))
+            except Exception:
+                logger.exception("Failed to create replacement session for user_id=%s", getattr(user, 'id', None))
+                session = None
+
+        if user and not session:
+            try:
+                session = ChatSession.objects.create(user_id=str(user.id))
+            except Exception:
+                logger.exception("Failed to create session for user_id=%s", getattr(user, 'id', None))
+                session = None
+
+        # Always use the global engine for processing.
+        # Per-session state isolation is handled via persisted ChatMessages;
+        # spinning up a new JemaEngine per request is too expensive.
+        engine = get_engine()
         
         # Process message
         response = engine.process_message(user_message)
-        
-        # Optionally persist to database
-        if session_id:
+
+        # Award first Jema interaction directly from the endpoint.
+        # This is idempotent via rewards reference_key and ensures points can
+        # still be granted even if ChatMessage persistence/signal is unavailable.
+        if user:
             try:
-                session = ChatSession.objects.get(id=session_id)
+                from rewards.services.events import award_jema_first_interaction
+                award_jema_first_interaction(user=user)
+            except Exception:
+                logger.exception("Failed awarding JEMA_FIRST_INTERACTION for user_id=%s", getattr(user, 'id', None))
+        
+        # Persist conversation when a session exists.
+        # Persistence/reward side-effects should not crash chat delivery.
+        if session:
+            try:
                 ChatMessage.objects.create(
                     session=session,
                     role='user',
@@ -165,8 +195,15 @@ def chat(request):
                     role='assistant',
                     content=response.get('message', '')
                 )
-            except ChatSession.DoesNotExist:
-                logger.warning(f"ChatSession {session_id} not found")
+            except Exception:
+                logger.exception(
+                    "Failed to persist chat messages for session_id=%s user_id=%s",
+                    session.id,
+                    getattr(user, 'id', None),
+                )
+
+            if isinstance(response, dict):
+                response.setdefault('session_id', session.id)
         
         return Response(response, status=status.HTTP_200_OK)
     
