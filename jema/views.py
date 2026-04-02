@@ -170,6 +170,16 @@ def chat(request):
         
         # Process message
         response = engine.process_message(user_message)
+
+        # Award first Jema interaction directly from the endpoint.
+        # This is idempotent via rewards reference_key and ensures points can
+        # still be granted even if ChatMessage persistence/signal is unavailable.
+        if user:
+            try:
+                from rewards.services.events import award_jema_first_interaction
+                award_jema_first_interaction(user=user)
+            except Exception:
+                logger.exception("Failed awarding JEMA_FIRST_INTERACTION for user_id=%s", getattr(user, 'id', None))
         
         # Persist conversation when a session exists.
         # Persistence/reward side-effects should not crash chat delivery.
