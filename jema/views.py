@@ -150,27 +150,23 @@ def chat(request):
 
         if user and session and session.user_id and session.user_id != str(user.id):
             # Prevent cross-user session usage by rebinding to a new session.
-            session = ChatSession.objects.create(user_id=str(user.id))
+            try:
+                session = ChatSession.objects.create(user_id=str(user.id))
+            except Exception:
+                logger.exception("Failed to create replacement session for user_id=%s", getattr(user, 'id', None))
+                session = None
 
         if user and not session:
-            session = ChatSession.objects.create(user_id=str(user.id))
-        
-        # Get session-specific engine for state isolation.
-        # If a session engine fails to initialize, fall back to global engine
-        # so chat remains available.
-        if session:
             try:
-                engine = get_session_engine(session.id, user=user)
-            except Exception as e:
-                logger.warning(
-                    "Session engine init failed for session_id=%s, falling back to global engine: %s",
-                    session.id,
-                    e,
-                )
-                engine = get_engine()
-        else:
-            # No session, use global engine
-            engine = get_engine()
+                session = ChatSession.objects.create(user_id=str(user.id))
+            except Exception:
+                logger.exception("Failed to create session for user_id=%s", getattr(user, 'id', None))
+                session = None
+
+        # Always use the global engine for processing.
+        # Per-session state isolation is handled via persisted ChatMessages;
+        # spinning up a new JemaEngine per request is too expensive.
+        engine = get_engine()
         
         # Process message
         response = engine.process_message(user_message)
