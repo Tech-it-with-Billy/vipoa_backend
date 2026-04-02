@@ -125,9 +125,12 @@ def chat(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Fetch user for personalization (optional)
+        # Resolve user for personalization/rewards.
+        # Prefer authenticated request user; fallback to payload user_id for legacy clients.
         user = None
-        if user_id:
+        if getattr(request.user, 'is_authenticated', False):
+            user = request.user
+        elif user_id:
             try:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
@@ -135,15 +138,26 @@ def chat(request):
             except Exception as e:
                 logger.debug(f"Could not fetch user {user_id}: {e}")
                 user = None
-        
-        # Get session-specific engine for state isolation
+
+        # Resolve or create session so user messages are persisted server-side.
+        # This allows post_save(ChatMessage) reward signals to run consistently.
+        session = None
         if session_id:
             try:
-                session_id_int = int(session_id)
-                engine = get_session_engine(session_id_int, user=user)
-            except (ValueError, TypeError):
-                # Invalid session_id, use global engine
-                engine = get_engine()
+                session = ChatSession.objects.get(id=int(session_id))
+            except (ValueError, TypeError, ChatSession.DoesNotExist):
+                logger.warning(f"ChatSession {session_id} not found or invalid")
+
+        if user and session and session.user_id and session.user_id != str(user.id):
+            # Prevent cross-user session usage by rebinding to a new session.
+            session = ChatSession.objects.create(user_id=str(user.id))
+
+        if user and not session:
+            session = ChatSession.objects.create(user_id=str(user.id))
+        
+        # Get session-specific engine for state isolation
+        if session:
+            engine = get_session_engine(session.id, user=user)
         else:
             # No session, use global engine
             engine = get_engine()
@@ -151,22 +165,21 @@ def chat(request):
         # Process message
         response = engine.process_message(user_message)
         
-        # Optionally persist to database
-        if session_id:
-            try:
-                session = ChatSession.objects.get(id=session_id)
-                ChatMessage.objects.create(
-                    session=session,
-                    role='user',
-                    content=user_message
-                )
-                ChatMessage.objects.create(
-                    session=session,
-                    role='assistant',
-                    content=response.get('message', '')
-                )
-            except ChatSession.DoesNotExist:
-                logger.warning(f"ChatSession {session_id} not found")
+        # Persist conversation when a session exists.
+        if session:
+            ChatMessage.objects.create(
+                session=session,
+                role='user',
+                content=user_message
+            )
+            ChatMessage.objects.create(
+                session=session,
+                role='assistant',
+                content=response.get('message', '')
+            )
+
+            if isinstance(response, dict):
+                response.setdefault('session_id', session.id)
         
         return Response(response, status=status.HTTP_200_OK)
     

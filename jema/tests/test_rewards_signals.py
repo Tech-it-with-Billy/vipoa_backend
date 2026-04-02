@@ -1,4 +1,6 @@
 from django.test import TestCase
+from rest_framework import status
+from rest_framework.test import APIClient
 
 from jema.models import ChatMessage, ChatSession
 from profiles.models import SupabaseUser
@@ -10,6 +12,7 @@ from rewards.models import PoaPointsTransaction
 class JemaRewardSignalTests(TestCase):
     def setUp(self):
         self.user = SupabaseUser.objects.create_user(email="jema-user@example.com")
+        self.client = APIClient()
 
     def test_first_user_message_awards_once(self):
         session = ChatSession.objects.create(user_id=str(self.user.id))
@@ -46,3 +49,23 @@ class JemaRewardSignalTests(TestCase):
             PoaPointsTransaction.objects.filter(type=RewardEventType.JEMA_FIRST_INTERACTION).count(),
             0,
         )
+
+    def test_chat_endpoint_without_session_id_awards_authenticated_user_once(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/jema/chat/",
+            {"message": "Hello Jema"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("session_id", response.data)
+
+        key = jema_first_interaction_key(self.user.id)
+        tx_qs = PoaPointsTransaction.objects.filter(
+            user=self.user,
+            type=RewardEventType.JEMA_FIRST_INTERACTION,
+            reference_key=key,
+        )
+        self.assertEqual(tx_qs.count(), 1)
