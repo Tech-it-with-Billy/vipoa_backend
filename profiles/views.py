@@ -35,6 +35,34 @@ def _extract_referred_by_code(payload) -> str:
     ).strip().upper()
 
 
+def _apply_referral_rewards(referral_id: int, referrer_user_id):
+    from .referral_rewards import process_referral_rewards
+    from django.contrib.auth import get_user_model as _get_user_model
+
+    _User = _get_user_model()
+    try:
+        referrer = _User.objects.get(pk=referrer_user_id)
+        total = referrer.referrals_made.count()
+        results = process_referral_rewards(referrer_user=referrer, referral_count=total)
+        rewarded_or_confirmed = any(
+            getattr(r, "outcome", None) in ("APPLIED", "ALREADY_REWARDED", "awarded", True)
+            for _, r in (results or [])
+        )
+        if rewarded_or_confirmed:
+            Referral.objects.filter(pk=referral_id).update(reward_granted=True)
+        logger.info(
+            "referral.reward_processed referral_id=%s referrer_user_id=%s referral_count=%s success=%s",
+            referral_id,
+            referrer_user_id,
+            total,
+            rewarded_or_confirmed,
+        )
+        return rewarded_or_confirmed
+    except Exception:
+        logger.exception("referral.reward_processing_failure referral_id=%s", referral_id)
+        return False
+
+
 # -----------------------------
 # REFERRAL HELPER
 # -----------------------------
@@ -78,25 +106,7 @@ def _process_referred_by(user, profile, code: str):
             referrer_user_id = referrer_profile.user_id
 
             def _award_on_commit():
-                from .referral_rewards import process_referral_rewards
-                from django.contrib.auth import get_user_model as _get_user_model
-                _User = _get_user_model()
-                try:
-                    referrer = _User.objects.get(pk=referrer_user_id)
-                    total = referrer.referrals_made.count()
-                    results = process_referral_rewards(referrer_user=referrer, referral_count=total)
-                    awarded = any(
-                        getattr(r, "outcome", None) in ("APPLIED", "awarded", True)
-                        for _, r in (results or [])
-                    )
-                    if awarded:
-                        Referral.objects.filter(pk=referral_id).update(reward_granted=True)
-                    logger.info(
-                        "referral.reward_on_commit referral_id=%s awarded=%s",
-                        referral_id, awarded,
-                    )
-                except Exception:
-                    logger.exception("referral.reward_on_commit_failure referral_id=%s", referral_id)
+                _apply_referral_rewards(referral_id, referrer_user_id)
 
             transaction.on_commit(_award_on_commit)
 
