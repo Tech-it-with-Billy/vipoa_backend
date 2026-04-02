@@ -155,9 +155,19 @@ def chat(request):
         if user and not session:
             session = ChatSession.objects.create(user_id=str(user.id))
         
-        # Get session-specific engine for state isolation
+        # Get session-specific engine for state isolation.
+        # If a session engine fails to initialize, fall back to global engine
+        # so chat remains available.
         if session:
-            engine = get_session_engine(session.id, user=user)
+            try:
+                engine = get_session_engine(session.id, user=user)
+            except Exception as e:
+                logger.warning(
+                    "Session engine init failed for session_id=%s, falling back to global engine: %s",
+                    session.id,
+                    e,
+                )
+                engine = get_engine()
         else:
             # No session, use global engine
             engine = get_engine()
@@ -166,17 +176,25 @@ def chat(request):
         response = engine.process_message(user_message)
         
         # Persist conversation when a session exists.
+        # Persistence/reward side-effects should not crash chat delivery.
         if session:
-            ChatMessage.objects.create(
-                session=session,
-                role='user',
-                content=user_message
-            )
-            ChatMessage.objects.create(
-                session=session,
-                role='assistant',
-                content=response.get('message', '')
-            )
+            try:
+                ChatMessage.objects.create(
+                    session=session,
+                    role='user',
+                    content=user_message
+                )
+                ChatMessage.objects.create(
+                    session=session,
+                    role='assistant',
+                    content=response.get('message', '')
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to persist chat messages for session_id=%s user_id=%s",
+                    session.id,
+                    getattr(user, 'id', None),
+                )
 
             if isinstance(response, dict):
                 response.setdefault('session_id', session.id)
