@@ -6,7 +6,6 @@ from django.conf.urls.static import static
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from django.views.decorators.csrf import csrf_exempt
 
 
 # -----------------------------------------
@@ -49,7 +48,6 @@ urlpatterns = [
     path("api/reviews/", include("reviews.urls")),
     path("api/products/", include("products.urls")),
     path("api/profiles/", include("profiles.urls")),
-    path("profiles/", include("profiles.urls")),
     path("api/poa-points/", include("rewards.urls")),  # alias
     path("api/rewards/", include("rewards.urls")),     # canonical
     path("api/surveys/", include(("surveys.urls", "surveys"), namespace="surveys")),
@@ -58,17 +56,17 @@ urlpatterns = [
     # ---- SWAGGER ROUTES (SUPERUSER ONLY) ----
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",
-        csrf_exempt(schema_view.without_ui(cache_timeout=0)),
+        schema_view.without_ui(cache_timeout=0),
         name="schema-json",
     ),
     path(
         "swagger/",
-        csrf_exempt(schema_view.with_ui("swagger", cache_timeout=0)),
+        schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
     path(
         "redoc/",
-        csrf_exempt(schema_view.with_ui("redoc", cache_timeout=0)),
+        schema_view.with_ui("redoc", cache_timeout=0),
         name="schema-redoc",
     ),
 ]
