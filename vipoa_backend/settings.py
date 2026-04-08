@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 try:
     from dotenv import load_dotenv
@@ -17,14 +18,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY
 # -----------------------------
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
+_secret_key = os.environ.get("SECRET_KEY")
+if not _secret_key:
+    raise ImproperlyConfigured("SECRET_KEY environment variable is not set")
+SECRET_KEY = _secret_key
 
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = [
     "api.vipoa.africa",
     ".railway.app",
-    "ALLOWED_HOSTS",
     "vipoa.africa",
     "127.0.0.1",
     "localhost"
@@ -163,13 +166,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:51084",
     "https://vipoa.africa",
     "https://www.vipoa.africa",
-    "http://localhost:5173",
-    "https://vipoa.netlify.app",
     "https://app.vipoa.africa",
-    "https://vipoa.pages.dev",
-    
-    "https://vipoaafrica.netlify.app",
-    
+    "https://vipoa.pages.dev",    
 ]
 
 CORS_ALLOW_CREDENTIALS = True

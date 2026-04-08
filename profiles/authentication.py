@@ -53,9 +53,7 @@ class SupabaseAuthentication(authentication.BaseAuthentication):
         payload = self._verify_jwt(token)
         user = self._get_or_create_user(payload)
 
-        logger.info(f"AUTH HEADER: {auth_header}")
-        logger.info(f"USER DATA: {payload}")
-        logger.info("🔥 AUTHENTICATION RUNNING")
+        logger.debug("Authentication successful for user_id=%s", payload.get("sub"))
 
         return (user, None)
 
