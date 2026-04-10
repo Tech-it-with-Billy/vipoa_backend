@@ -135,8 +135,7 @@ def chat(request):
         
         # Process message with user profile
         response = engine.process_message(
-            message=user_message,
-            user_id=getattr(user, 'id', None),
+            user_input=user_message,
             user_profile=user_profile,
         )
         
