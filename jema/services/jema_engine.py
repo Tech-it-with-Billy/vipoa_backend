@@ -115,6 +115,10 @@ COMMON_RECIPES = {
 
 
 def split_steps_paragraph(paragraph: str) -> list:
+    # Guard: If paragraph is already a list, return it as-is
+    if isinstance(paragraph, list):
+        return paragraph if paragraph else []
+    
     if not paragraph or not paragraph.strip():
         return []
 
@@ -330,7 +334,6 @@ class JemaEngine:
         for idx, row in self.recipes_df.iterrows():
             if str(row.get('meal_name', '')).strip().lower() == query_lower:
                 matched_row = row.to_dict()
-                print(f"[CSV DEBUG] Exact match found for '{recipe_name}'")
                 return matched_row
         
         # Priority 2: Compound meal detection
@@ -351,18 +354,15 @@ class JemaEngine:
 
             # Guard 1: Reject if matched name differs in length by more than 3 characters
             if abs(len(matched_lower) - len(query_lower)) > 3:
-                print(f"[CSV DEBUG] Rejected close match '{matched_lower}' — length too different from '{query_lower}'")
                 return None
 
             # Guard 2: Reject if query has more words than matched name (prevents Ugali Mayai → Ugali)
             if len(query_lower.split()) > len(matched_lower.split()) + 1:
-                print(f"[CSV DEBUG] Rejected close match '{matched_lower}' — query has more words than match")
                 return None
 
             # Find and return the actual row
             original_idx = meal_names_lower.index(matched_lower)
             matched_row = self.recipes_df.iloc[original_idx].to_dict()
-            print(f"[CSV DEBUG] Close match found for '{recipe_name}' → '{matched_lower}'")
             return matched_row
 
         return None
@@ -392,7 +392,6 @@ class JemaEngine:
                 idx2 = meal_names_lower.index(match2[0])
                 row1 = df.iloc[idx1]
                 row2 = df.iloc[idx2]
-                print(f"[CSV DEBUG] Compound meal detected: '{match1[0]}' + '{match2[0]}'")
                 return {
                     "is_compound": True,
                     "component_1_name": row1.get('meal_name', ''),
@@ -453,7 +452,6 @@ class JemaEngine:
                     base_name = ' '.join(words[1:])
                     for idx, row in self.recipes_df.iterrows():
                         if str(row.get('meal_name', '')).strip().lower() == base_name:
-                            print(f"[CSV DEBUG] Modifier match: '{modifier}' + '{base_name}'")
                             return row, modifier
 
         return None, None
@@ -503,12 +501,13 @@ class JemaEngine:
         # Return as newline-separated lines (Groq will see each as a step to title and number)
         return "\n".join(cleaned_sentences)
 
-    def process_message(self, user_input: str) -> Dict:
+    def process_message(self, user_input: str, user_profile: dict = None) -> Dict:
         """
         Process a user message and return a response.
         
         Args:
             user_input: User's natural language input
+            user_profile: Optional dict with user personalisation data (diet, allergies, medical conditions, etc.)
         
         Returns:
             Dictionary with:
@@ -539,39 +538,39 @@ class JemaEngine:
         # When awaiting_recipe_choice is True, the user is selecting a recipe — not requesting community recipes
         if community and intent in [Intent.MEAL_IDEA, Intent.INFORMATION, Intent.CHAT_SOCIAL, Intent.RECIPE_REQUEST]:
             if not (self.awaiting_recipe_choice and self.last_suggested_recipes):
-                return self._handle_community_request(user_input, community)
+                return self._handle_community_request(user_input, community, user_profile)
         
         if intent == Intent.GREETING:
-            return self._handle_greeting(user_input)
+            return self._handle_greeting(user_input, user_profile)
         
         if intent == Intent.REJECTION:
-            return self._handle_rejection(user_input)
+            return self._handle_rejection(user_input, user_profile)
         
         if intent == Intent.ACCOMPANIMENT:
-            return self._handle_accompaniment(user_input)
+            return self._handle_accompaniment(user_input, user_profile)
         
         if intent == Intent.FOLLOW_UP and len(self.llm.conversation_history) > 0:
-            return self._handle_follow_up(user_input)
+            return self._handle_follow_up(user_input, user_profile)
         
         if self.awaiting_recipe_choice and self.last_suggested_recipes:
-            result = self._handle_recipe_selection(user_input)
+            result = self._handle_recipe_selection(user_input, user_profile)
             if result:
                 return result
         
         if intent == Intent.MEAL_IDEA:
-            return self._handle_meal_idea(user_input)
+            return self._handle_meal_idea(user_input, user_profile)
         
         if intent in [Intent.INFORMATION, Intent.CHAT_SOCIAL]:
-            return self._handle_information(user_input)
+            return self._handle_information(user_input, user_profile)
         
         if intent == Intent.RECIPE_REQUEST:
-            return self._handle_recipe_request(user_input)
+            return self._handle_recipe_request(user_input, user_profile)
         
         if intent == Intent.INGREDIENT_BASED or intent == Intent.MEAL_IDEA:
-            return self._handle_ingredient_based(user_input, constraints)
+            return self._handle_ingredient_based(user_input, constraints, user_profile)
         
         # Fallback
-        return self._handle_fallback(user_input)
+        return self._handle_fallback(user_input, user_profile)
 
     def _reset_conversation(self) -> Dict:
         """Reset conversation state."""
@@ -590,7 +589,7 @@ class JemaEngine:
         
         return self._build_response(message, [])
 
-    def _handle_community_request(self, user_input: str, community: str) -> Dict:
+    def _handle_community_request(self, user_input: str, community: str, user_profile: dict = None) -> Dict:
         """Handle requests for specific community/ethnic cuisines."""
         community_matcher = self.matcher.filter_by_community(community).exclude_beverages()
         all_community_recipes = self.recipes_df[
@@ -629,16 +628,17 @@ class JemaEngine:
             
             return self._build_response(message, [])
 
-    def _handle_greeting(self, user_input: str) -> Dict:
+    def _handle_greeting(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle greeting intents."""
         if self.recipe_confirmed and self.current_recipe:
             response = self.llm.general_response(
                 f"User said: '{user_input}' (they're working on {self.current_recipe.get('meal_name', 'a recipe')})",
                 use_history=False,
-                include_cta=False
+                include_cta=False,
+                user_profile=user_profile
             )
         elif len(self.llm.conversation_history) > 0:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+            response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
         else:
             if self.llm.current_language == 'swahili':
                 response = "Habari! Mimi ni Jema. Niambie viungo unavyonazo au chakula unachotaka!"
@@ -650,7 +650,7 @@ class JemaEngine:
         
         return self._build_response(response, [])
 
-    def _handle_rejection(self, user_input: str) -> Dict:
+    def _handle_rejection(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle rejection intents (user doesn't like suggestion)."""
         self.current_recipe = None
         self.recipe_confirmed = False
@@ -685,37 +685,38 @@ class JemaEngine:
                 return self._build_response(message, self.last_suggested_recipes)
         
         # Fallback
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
         return self._build_response(response, [])
 
-    def _handle_accompaniment(self, user_input: str) -> Dict:
+    def _handle_accompaniment(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle accompaniment queries (what goes with X?)."""
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
         return self._build_response(response, [])
 
-    def _handle_follow_up(self, user_input: str) -> Dict:
+    def _handle_follow_up(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle follow-up questions."""
         if self.recipe_confirmed and self.current_recipe:
             response = self.llm.general_response(
                 f"{user_input} (Answer in context of {self.current_recipe.get('meal_name', 'this recipe')})",
                 use_history=False,
-                include_cta=False
+                include_cta=False,
+                user_profile=user_profile
             )
         else:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+            response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
         
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
         return self._build_response(response, [])
 
-    def _handle_recipe_selection(self, user_input: str) -> Optional[Dict]:
+    def _handle_recipe_selection(self, user_input: str, user_profile: dict = None) -> Optional[Dict]:
         """Handle user selecting from suggested recipes."""
         selected = None
         selection_lower = user_input.lower().strip()
@@ -768,7 +769,7 @@ class JemaEngine:
         # ── Recipe found — display it ──────────────────────────────────────────────────
         return self._display_full_recipe(selected, user_input, self.last_user_ingredients)
 
-    def _handle_meal_idea(self, user_input: str) -> Dict:
+    def _handle_meal_idea(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle meal idea queries (what should I make for breakfast?)."""
         # Extract meal time if mentioned
         meal_time = ""
@@ -782,21 +783,21 @@ class JemaEngine:
         time_context = f" for {meal_time}" if meal_time else ""
         prompt = f"Suggest 3-4 delicious traditional African recipes{time_context} from across the continent. Include the dish name and a brief description of why it's great. Keep it conversational and appetizing."
         
-        response = self.llm.general_response(prompt, use_history=False, include_cta=False)
+        response = self.llm.general_response(prompt, use_history=False, include_cta=False, user_profile=user_profile)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
         return self._build_response(response, [])
 
-    def _handle_information(self, user_input: str) -> Dict:
+    def _handle_information(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle information/social chat."""
         # Check if this might be a recipe request that wasn't caught by RECIPE_REQUEST intent
         recipe_name = self._extract_recipe_name(user_input)
         if recipe_name:
             # Route to recipe handler
-            return self._handle_recipe_request(user_input)
+            return self._handle_recipe_request(user_input, user_profile)
         
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
@@ -854,7 +855,7 @@ class JemaEngine:
 
         return ""
 
-    def _handle_recipe_request(self, user_input: str) -> Dict:
+    def _handle_recipe_request(self, user_input: str, user_profile: dict = None) -> Dict:
         """
         Handle direct recipe requests like:
         - "How do I cook pilau?"
@@ -897,14 +898,6 @@ class JemaEngine:
                 # CSV found — extract the raw ingredients and steps
                 csv_cuisine_region = csv_recipe.get("cuisine_region", "East Africa")
                 
-                # Debug: Show ALL available columns and values
-                print(f"\n[CSV DEBUG] Recipe found: {recipe_name}")
-                print(f"[CSV DEBUG] Available columns in row: {list(csv_recipe.keys())}")
-                for col, val in csv_recipe.items():
-                    if val and isinstance(val, str):
-                        preview = str(val)[:150].replace("\n", " ")
-                        print(f"[CSV DEBUG]   {col}: {preview}...")
-                
                 # Try multiple possible column names for steps and ingredients
                 csv_steps_paragraph = csv_recipe.get("recipes", "") or csv_recipe.get("steps", "") or csv_recipe.get("instructions", "") or csv_recipe.get("method", "")
                 csv_ingredients_raw = csv_recipe.get("core_ingredients", "") or csv_recipe.get("ingredients", "") or csv_recipe.get("ingredient_list", "")
@@ -917,19 +910,8 @@ class JemaEngine:
                 ]
                 csv_ingredients = ', '.join(ingredient_parts)
                 
-                print(f"[CSV DEBUG] Found steps: {len(csv_steps_paragraph)} chars")
-                print(f"[CSV DEBUG] Found ingredients: {len(csv_ingredients)} chars")
-                
-                if not csv_steps_paragraph:
-                    print(f"[CSV DEBUG] ERROR: No steps found in any column!")
-                
                 # Split paragraph steps into individual sentences
                 csv_steps = split_steps_paragraph(csv_steps_paragraph)
-                print(f"[CSV DEBUG] After split: {len(csv_steps)} individual steps")
-                
-                # FIX 3: Add full debug output for each step
-                for i, step in enumerate(csv_steps):
-                    print(f"[CSV DEBUG] Full step {i+1} ({len(step)} chars): {step}")
                 
                 # Handle compound meals
                 if csv_recipe.get("is_compound"):
@@ -1013,7 +995,7 @@ class JemaEngine:
             )
             return self._build_response(response, [])
 
-    def _handle_ingredient_based(self, user_input: str, constraints: List) -> Dict:
+    def _handle_ingredient_based(self, user_input: str, constraints: List, user_profile: dict = None) -> Dict:
         """Handle ingredient-based recipe matching across African cuisines with deduplication."""
         # Extract ingredients
         user_ingredients = IngredientNormalizer.extract_from_string(user_input)
@@ -1397,15 +1379,15 @@ class JemaEngine:
         
         return self._build_response(message, [])
 
-    def _handle_fallback(self, user_input: str) -> Dict:
+    def _handle_fallback(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle unrecognized intents."""
         # Check if this might be a recipe request
         recipe_name = self._extract_recipe_name(user_input)
         if recipe_name:
             # Route to recipe handler
-            return self._handle_recipe_request(user_input)
+            return self._handle_recipe_request(user_input, user_profile)
         
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         

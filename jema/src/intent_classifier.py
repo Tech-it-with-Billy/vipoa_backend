@@ -40,14 +40,44 @@ class IntentClassifier:
     # Intent detection patterns
     INTENT_PATTERNS = {
         Intent.INGREDIENT_BASED: [
-            "i have", "with these", "what can i make", "what do i make",
-            "have ingredients", "only have", "ingredients i have",
-            "nina", "ninavyo", "nini ninaweza"
+            "i have", "with these", "have ingredients", "only have",
+            "ingredients i have", "nina", "ninavyo", "nini ninaweza",
+            # New ingredient-based triggers
+            "i've got", "using", "with chicken", "with beef",
+            "with fish", "with rice", "with tomatoes", "with onions",
+            "what can i cook with", "what can i make with",
+            "cook with", "make with", "recipes with", "dish with",
+            "meal with", "something with"
         ],
         Intent.RECIPE_REQUEST: [
             "recipe for", "how do i make", "make me", "teach me",
             "show me how", "want to make", "would like to make",
-            "tengeneza", "pika", "karibu", "do you have"
+            "tengeneza", "pika", "karibu", "do you have",
+            # Suggestion and recommendation phrases
+            "suggest", "recommend", "give me", "what can i make",
+            "what should i cook", "what can i cook", "meal i can",
+            "recipe do you", "i want to make", "how do i cook",
+            "what do you recommend", "can you suggest", "ideas for",
+            # Meal timing phrases — CRITICAL for meal occasion context
+            "for dinner", "for lunch", "for breakfast", "for brunch",
+            "for iftar", "for suhoor", "for eid", "for ramadan",
+            "after the gym", "after work", "before bed",
+            "in the morning", "in the evening", "at night",
+            # Speed and constraint phrases
+            "quick meal", "fast meal", "something quick", "something easy",
+            "under 30", "in 30 minutes", "cook in", "make in",
+            "in under", "less than 30", "quick african", "fast african",
+            # Descriptor and protein phrases — capture meat/vegetarian/vegan requests
+            "hearty", "filling", "light meal", "heavy meal",
+            "high-protein", "low-calorie", "healthy meal",
+            "meat dish", "chicken dish", "beef dish", "fish dish",
+            "vegetarian dish", "vegan dish",
+            # General recipe request phrases
+            "something to eat", "to eat", "can i cook", "can i make",
+            "a recipe", "a dish", "a meal", "i can have",
+            # Additional meal suggestion patterns
+            "i can make for", "i can cook for", "i can have for",
+            "what meals", "what dishes", "what recipes"
         ],
         Intent.HOW_TO_COOK: [
             "how do i cook", "how to cook", "steps", "instructions",

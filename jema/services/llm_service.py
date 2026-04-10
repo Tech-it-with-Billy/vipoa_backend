@@ -119,15 +119,198 @@ Style: short, simple, friendly, to the point. Plain text only.
             instruction = LanguageDetector.get_language_instruction(detected_language)
             self.system_prompt = self.system_prompt_template.format(language_instruction=instruction)
 
+    def _build_personalisation_block(self, user_profile: dict) -> str:
+        """
+        Build a personalisation contextblock with 12 sections to inject into Groq system prompts.
+        Safely handles None/missing profile data, returning empty string on any error.
+        
+        Sections:
+        1. Religious dietary rules (Muslim/Hindu/Jewish)
+        2. Dietary preference (Keto/Vegan/Vegetarian/Pescatarian/Low-carb/Mediterranean)
+        3. Medical conditions (Diabetes/Hypertension/Anti-inflammatory/Low-FODMAP)
+        4. Allergies
+        5. Fitness goals
+        6. Calorie targets
+        7. Cooking skill level
+        8. Budget/Income constraints
+        9. Time constraints (speed preference)
+        10. Dislikes/avoided ingredients
+        11. Universal stock substitution rule
+        12. Diversity/repetition prevention rule
+        
+        Args:
+            user_profile: Dict with keys like religion, dietary_preference, allergies, etc.
+            
+        Returns:
+            String block to inject into system prompt, or "" if profile is None or error occurs
+        """
+        try:
+            if not user_profile:
+                return ""
+            
+            block_parts = []
+            
+            # Section 1: Religion-based dietary rules
+            religion = user_profile.get("religion", "").lower().strip() if user_profile.get("religion") else ""
+            if religion == "muslim":
+                block_parts.append("- Religious dietary rule: User is Muslim. ONLY suggest Halal meat (no pork, no carrion-eaters like scavenger birds). Avoid alcohol in cooking.")
+            elif religion == "hindu":
+                block_parts.append("- Religious dietary rule: User is Hindu. NEVER suggest beef/cattle products. Avoid garlic and onion if user follows strict rules.")
+            elif religion == "jewish":
+                block_parts.append("- Religious dietary rule: User is Jewish. Suggest Kosher options when possible. Avoid shellfish and pork.")
+            
+            # Section 2: Primary dietary preference
+            dietary = user_profile.get("dietary_preference", "").lower().strip() if user_profile.get("dietary_preference") else ""
+            if dietary and dietary != "balanced":
+                dietary_rules = {
+                    "vegan": "User is VEGAN — NO animal products. Suggest plant-based proteins (beans, lentils, nuts, seeds, tofu).",
+                    "vegetarian": "User is VEGETARIAN — NO meat/fish but eggs/dairy OK. Suggest legumes for protein.",
+                    "keto": "User is on KETO diet — minimize carbs, maximize healthy fats and protein. Suggest low-carb vegetables, oils, meat.",
+                    "pescatarian": "User is PESCATARIAN — NO meat but fish/seafood OK. Suggest fish and plant-based proteins.",
+                    "low-carb": "User follows LOW-CARB diet — minimize grains/starches/sugar. Suggest vegetables, protein, healthy fats.",
+                    "mediterranean": "User follows MEDITERRANEAN diet — emphasis on olive oil, vegetables, whole grains, lean proteins, fish.",
+                    "hindu_vegetarian": "User is Hindu Vegetarian — NO meat/fish/eggs. Suggest legumes and dairy for protein.",
+                }
+                rule = dietary_rules.get(dietary, "")
+                if rule:
+                    block_parts.append(f"- Dietary preference: {rule}")
+            
+            # Section 3: Medical conditions
+            medical = user_profile.get("medical_conditions", []) or user_profile.get("health_conditions", [])
+            if medical and isinstance(medical, (list, tuple)):
+                medical_list = [m.lower().strip() for m in medical if isinstance(m, str)]
+                medical_rules = {
+                    "diabetes": "User has Diabetes — suggest low-GI carbs (whole grains over white rice), lean proteins, limit simple sugars and refined flour.",
+                    "hypertension": "User has Hypertension — MINIMIZE salt, suggest fresh herbs for flavor, use minimal salt or salt-free spices. Suggest potassium-rich foods (leafy greens, legumes).",
+                    "anti-inflammatory": "User follows Anti-inflammatory diet — emphasize omega-3 oils, turmeric, ginger. Avoid seed oils and ultra-processed ingredients.",
+                    "low-fodmap": "User follows Low-FODMAP diet — avoid onions, garlic, wheat. Suggest rice, gluten-free options, gentle vegetables.",
+                }
+                for cond in medical_list:
+                    rule = medical_rules.get(cond, "")
+                    if rule:
+                        block_parts.append(f"- Medical consideration: {rule}")
+            
+            # Section 4: Allergies
+            allergies = user_profile.get("allergies", [])
+            if allergies and isinstance(allergies, (list, tuple)):
+                allergy_list = [a.strip() for a in allergies if isinstance(a, str) and a.strip()]
+                if allergy_list:
+                    allergy_str = ", ".join(allergy_list)
+                    block_parts.append(f"- Allergies: NEVER suggest any dish containing: {allergy_str}. Check ingredients carefully.")
+            
+            # Section 5: Fitness goal
+            fitness = user_profile.get("fitness_goal", "").lower().strip() if user_profile.get("fitness_goal") else ""
+            if fitness and fitness != "general health":
+                fitness_rules = {
+                    "muscle_gain": "User's fitness goal is MUSCLE GAIN — prioritize high-protein recipes (legumes, meat, eggs). Suggest adequate calories.",
+                    "weight_loss": "User's fitness goal is WEIGHT LOSS — suggest lighter recipes with vegetables, lean protein, minimal oil/fat.",
+                    "endurance": "User's fitness goal is ENDURANCE — suggest recipes with sustained-release carbs (whole grains, oats) + lean protein.",
+                    "blood_sugar_control": "User's fitness goal is BLOOD SUGAR CONTROL — suggest balanced meals with fiber, whole grains, lean protein. Minimize simple sugars.",
+                }
+                rule = fitness_rules.get(fitness, "")
+                if rule:
+                    block_parts.append(f"- Fitness goal: {rule}")
+            
+            # Section 6: Calorie target
+            calories = user_profile.get("calorie_target")
+            if calories:
+                try:
+                    calorie_int = int(calories)
+                    if calorie_int < 1500:
+                        block_parts.append(f"- Calorie target: {calorie_int} kcal/day — suggest lighter, lower-calorie recipes with mostly vegetables and lean protein.")
+                    elif 1500 <= calorie_int <= 2200:
+                        block_parts.append(f"- Calorie target: {calorie_int} kcal/day — suggest balanced recipes with good portions of vegetables, protein, and whole grains.")
+                    else:
+                        block_parts.append(f"- Calorie target: {calorie_int} kcal/day — suggest hearty, calorie-rich recipes with proteins and healthy fats.")
+                except (ValueError, TypeError):
+                    pass
+            
+            # Section 7: Cooking skill level
+            skill = user_profile.get("cooking_skills", "").lower().strip() if user_profile.get("cooking_skills") else ""
+            if not skill:
+                skill = user_profile.get("cooking_level", "").lower().strip() if user_profile.get("cooking_level") else ""
+            
+            if skill:
+                skill_rules = {
+                    "novice": "User is a NOVICE cook — suggest simple, easy-to-follow recipes with minimal steps. Use common, accessible ingredients.",
+                    "beginner": "User is a BEGINNER cook — suggest straightforward recipes with clear instructions. Minimize advanced techniques.",
+                    "intermediate": "User is an INTERMEDIATE cook — can handle moderate complexity. Suggest recipes with traditional techniques.",
+                    "advanced": "User is an ADVANCED cook — suggest authentic, detailed recipes with traditional preparation methods.",
+                }
+                rule = skill_rules.get(skill, "")
+                if rule:
+                    block_parts.append(f"- Cooking skill: {rule}")
+            
+            # Section 8: Budget/Income
+            income = user_profile.get("income_level", "").lower().strip() if user_profile.get("income_level") else ""
+            if income:
+                income_rules = {
+                    "low": "User has LIMITED budget — suggest recipes using affordable, staple ingredients. Avoid expensive spices or premium cuts.",
+                    "middle": "User has MODERATE budget — suggest recipes with reasonable ingredient costs. Balance affordability with nutrition.",
+                    "high": "User has flexible budget — suggest recipes with quality ingredients, premium options available.",
+                }
+                rule = income_rules.get(income, "")
+                if rule:
+                    block_parts.append(f"- Budget: {rule}")
+            
+            # Section 9: Time/Speed constraints
+            speed = user_profile.get("eating_reality", "").lower().strip() if user_profile.get("eating_reality") else ""
+            if speed == "fast":
+                block_parts.append("- Time constraint: User prefers QUICK recipes (under 30 mins). Suggest fast-cooking dishes, minimal prep, use pre-cut/canned ingredients when helping.")
+            elif speed == "balanced":
+                block_parts.append("- Time constraint: User has MODERATE time. Suggest recipes that are not too complex but allow some prep time.")
+            elif speed == "variety":
+                block_parts.append("- Time constraint: User values VARIETY over speed. Suggest diverse recipes even if they take more time.")
+            
+            # Section 10: Dislikes/avoided ingredients
+            dislikes = user_profile.get("dislikes", [])
+            if dislikes and isinstance(dislikes, (list, tuple)):
+                dislike_list = [d.strip() for d in dislikes if isinstance(d, str) and d.strip()]
+                if dislike_list:
+                    dislike_str = ", ".join(dislike_list)
+                    block_parts.append(f"- Dislikes: User does NOT like: {dislike_str}. Avoid these ingredients or suggest alternatives.")
+            
+            # Section 11: Universal stock substitution rule (applies to ALL non-meat eaters)
+            dietary_pref = dietary or ""
+            if dietary_pref in ("vegan", "vegetarian", "hindu_vegetarian", "pescatarian"):
+                block_parts.append("- Stock substitution RULE: If recipe calls for meat/chicken/fish stock, ALWAYS suggest vegetable stock instead. Non-meat eaters must NOT get meat-based stocks.")
+            
+            # Section 12: Diversity/repetition prevention rule
+            block_parts.append("- Diversity rule: If you suggest multiple recipes to this user in a conversation, make sure each suggestion is DIFFERENT from previous ones. Don't repeat the same recipe name or very similar preparation methods.")
+            
+            # Build final block
+            if block_parts:
+                block = "\n\nUSER PERSONALISATION CONTEXT:\n" + "\n".join(block_parts)
+                return block
+            else:
+                return ""
+        
+        except Exception as e:
+            # Fail silently — return empty string if any error occurs
+            # This ensures personalisation failures don't break the LLM
+            print(f"[_build_personalisation_block] Error: {e}")
+            return ""
+
     def get_conversation_context(self) -> List[Dict[str, str]]:
         return [{"role": "system", "content": self.system_prompt}] + self.conversation_history
 
-    def general_response(self, user_input: str, use_history: bool = True, include_cta: bool = True) -> str:
+    def general_response(self, user_input: str, use_history: bool = True, include_cta: bool = True, user_profile: dict = None) -> str:
         if use_history:
             self.add_to_history("user", user_input)
             messages = self.get_conversation_context()
         else:
             messages = [{"role": "user", "content": user_input}]
+        
+        # Inject personalisation block if present
+        if user_profile:
+            personalisation_block = self._build_personalisation_block(user_profile)
+            if personalisation_block:
+                # Update the system prompt in the messages
+                if messages and messages[0]["role"] == "system":
+                    messages[0]["content"] = messages[0]["content"] + personalisation_block
+                else:
+                    messages.insert(0, {"role": "system", "content": self.system_prompt + personalisation_block})
+        
         if self.client is None:
             default = "I'm here to help you cook! Tell me a meal name or the ingredients you have."
             if use_history:
