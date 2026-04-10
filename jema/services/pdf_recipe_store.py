@@ -41,11 +41,7 @@ class PDFRecipeStore:
         self.recipes: Dict[str, Dict] = {}
         self._load_pdf()
         
-        # Debug output showing name-content pairing
-        for name, data in self.recipes.items():
-            first_ingredient = str(data.get('ingredients_raw', ''))[:80]
-            first_step = str(data.get('steps', [''])[0])[:80] if data.get('steps') else ''
-            print(f"[PDF PARSE DEBUG] Name: '{name}' | First ingredient: '{first_ingredient}' | First step: '{first_step}'")
+
 
     def _load_pdf(self):
         """Extract and store all African recipes from the PDF."""
@@ -165,11 +161,24 @@ class PDFRecipeStore:
 
         Returns None if not a compound meal or components cannot be found.
         """
+        if not recipe_name:
+            return None
+            
         name_lower = recipe_name.lower().strip()
+
+        # Guard: Reject invalid recipe name strings
+        INVALID_LOOKUPS = {
+            "for iftar", "for suhoor", "for eid", "for dinner",
+            "for lunch", "for breakfast", "quickly", "dinner",
+            "lunch", "breakfast", "meal", "dish", "recipe",
+        }
+        
+        if name_lower in INVALID_LOOKUPS:
+            return None
+        
         components = self.COMPOUND_MEALS.get(name_lower)
 
         if not components:
-            print(f"[PDF DEBUG] '{recipe_name}' is not a known compound meal")
             return None
 
         combined_ingredients = []
@@ -204,10 +213,7 @@ class PDFRecipeStore:
                 combined_tips.extend(component_recipe.get("tips", []))
 
         if not found_components:
-            print(f"[PDF DEBUG] Compound meal '{recipe_name}' has no findable components in PDF")
             return None
-
-        print(f"[PDF DEBUG] Compound meal found: {' + '.join(found_components)}")
         return {
             "meal_name":       recipe_name.title(),
             "is_compound":     True,
@@ -268,9 +274,10 @@ class PDFRecipeStore:
         Look up a recipe by name with strict matching.
         
         Strategy:
-        1. Exact match (case-insensitive, whitespace trimmed)
-        2. Close match with 0.75 cutoff and guards
-        3. Return None if no match found
+        1. Guard against non-recipe strings (context words, meal timing phrases)
+        2. Exact match (case-insensitive, whitespace trimmed)
+        3. Close match with 0.75 cutoff and guards
+        4. Return None if no match found
         
         Returns dict with meal_name, ingredients_raw, steps, tips.
         Returns None ONLY if recipe not found.
@@ -278,16 +285,48 @@ class PDFRecipeStore:
         if not recipe_name:
             return None
         
-        query = recipe_name.strip().lower()
+        name_lower = (recipe_name or "").lower().strip()
+
+        # Guard: Reject strings that are clearly NOT recipe names
+        # These are context words that should never be looked up in the recipe database
+        INVALID_LOOKUPS = {
+            # Meal timing
+            "for iftar", "for suhoor", "for eid", "for dinner",
+            "for lunch", "for breakfast", "for brunch",
+            "after the gym", "after work", "after school",
+            # Generic meal words
+            "quickly", "dinner", "lunch", "breakfast", "meal", "dish", "recipe",
+            "tonight", "today", "something", "anything",
+            # Question fragments
+            "i can make", "in under 30 minutes", "a meat dish",
+            "what do you recommend",
+        }
+
+        # Reject if name exactly matches an invalid lookup
+        if name_lower in INVALID_LOOKUPS:
+            return None
+
+        # Reject if name starts with a preposition — recipe names never start with these
+        first_word = name_lower.split()[0] if name_lower.split() else ""
+        prepositions = {"for", "after", "before", "in", "at", "what", "how", "a", "an"}
+        if first_word in prepositions:
+            return None
+
+        # Reject if name is 3 words or fewer and contains only common words
+        words = name_lower.split()
+        common = {"for", "the", "a", "an", "to", "in", "at", "on", "of",
+                  "with", "and", "or", "dinner", "lunch", "breakfast",
+                  "iftar", "suhoor", "quickly", "fast", "meal", "dish",
+                  "meat", "chicken", "beef"}
+        if len(words) <= 3 and all(w in common for w in words):
+            return None
         
-        print(f"[PDF DEBUG] Looking up: '{recipe_name}' in {len(self.recipes)} PDF recipes")
-        print(f"[PDF DEBUG] PDF recipe names: {[r for r in self.recipes.keys()]}")
+        query = name_lower
         
         # Step 1: Exact match
         for stored_name in self.recipes.keys():
             stored_name_lower = stored_name.strip().lower()
             if stored_name_lower == query:
-                print(f"[PDF DEBUG] Exact match found: '{stored_name}'")
                 return self.recipes[stored_name]
         
         # Step 2: Close match with high threshold and guards
@@ -299,21 +338,17 @@ class PDFRecipeStore:
             
             # Guard 1: reject if length differs by more than 4 characters
             if abs(len(matched_lower) - len(query)) > 4:
-                print(f"[PDF DEBUG] Rejected close match '{matched_lower}' — length too different from '{query}'")
                 return None
             
             # Guard 2: reject if query has more words than matched name
             if len(query.split()) > len(matched_lower.split()) + 1:
-                print(f"[PDF DEBUG] Rejected close match '{matched_lower}' — query has more words than match")
                 return None
             
             # Find the original recipe with matching name
             for original_name in self.recipes.keys():
                 if original_name.strip().lower() == matched_lower:
-                    print(f"[PDF DEBUG] Close match found: '{original_name}'")
                     return self.recipes[original_name]
         
-        print(f"[PDF DEBUG] No match found in PDF for '{recipe_name}'")
         return None
 
     def get_all_recipes(self) -> List[str]:

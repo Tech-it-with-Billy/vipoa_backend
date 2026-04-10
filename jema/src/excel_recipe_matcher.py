@@ -47,6 +47,24 @@ class ExcelRecipeMatcher:
         self.recipes_df = recipes_df
     
     @staticmethod
+    def _safe_cook_time(value: Optional[str]) -> int:
+        """
+        Safely convert cook_time from string to integer.
+        
+        Args:
+            value: Cook time value (potentially a string from Excel)
+            
+        Returns:
+            Integer cook time in minutes, or 9999 if unparseable
+        """
+        if value is None:
+            return 9999
+        try:
+            return int(str(value).strip())
+        except (ValueError, AttributeError):
+            return 9999
+    
+    @staticmethod
     def score_recipe(
         recipe_row: pd.Series,
         user_ingredients: set,
@@ -116,14 +134,14 @@ class ExcelRecipeMatcher:
                 match_percentage = 1.0
             
             # Time score: +1 if cook_time <= 30 minutes
-            time_score = 1 if (cook_time and cook_time <= 30) else 0
+            time_score = 1 if (cook_time and ExcelRecipeMatcher._safe_cook_time(cook_time) <= 30) else 0
             
             # Constraint bonuses
             constraint_bonus = 0
             if user_constraints:
                 if user_constraints.get('meal_type') and meal_type.lower() == user_constraints['meal_type'].lower():
                     constraint_bonus += 2
-                if user_constraints.get('quick') and cook_time and cook_time <= 30:
+                if user_constraints.get('quick') and cook_time and ExcelRecipeMatcher._safe_cook_time(cook_time) <= 30:
                     constraint_bonus += 1
             
             # Total score
@@ -241,7 +259,7 @@ class ExcelRecipeMatcher:
         """
         filtered_df = self.recipes_df[
             (self.recipes_df['cook_time'].isna()) | 
-            (self.recipes_df['cook_time'] <= max_minutes)
+            (self.recipes_df['cook_time'].apply(lambda x: self._safe_cook_time(x)) <= max_minutes)
         ]
         return ExcelRecipeMatcher(filtered_df)
     
