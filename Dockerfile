@@ -27,4 +27,4 @@ EXPOSE 8080
 
 # Collect static files, run migrations, and start Gunicorn at runtime so that
 # Railway's environment variables (SECRET_KEY, DATABASE_URL, etc.) are available.
-CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn vipoa_backend.wsgi:application --bind 0.0.0.0:$PORT"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && python manage.py create_superuser_once && gunicorn vipoa_backend.wsgi:application --bind 0.0.0.0:$PORT"]
