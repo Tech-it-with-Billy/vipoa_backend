@@ -92,24 +92,28 @@ def chat(request):
         
         user_message = data.get('message', '').strip()
         session_id = data.get('session_id')
-        user_id = data.get('user_id')
-        
+
         if not user_message:
             return Response(
                 {"error": "Message field is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Fetch user for personalization (optional)
+
+        # Resolve the authenticated user from the request (set by SupabaseAuthentication).
+        # Fall back to a body-supplied user_id only if the token produced no user.
         user = None
-        if user_id:
-            try:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
-                user = User.objects.get(id=user_id)
-            except Exception as e:
-                logger.debug(f"Could not fetch user {user_id}: {e}")
-                user = None
+        if request.user and request.user.is_authenticated:
+            user = request.user
+        else:
+            user_id = data.get('user_id')
+            if user_id:
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    user = User.objects.get(id=user_id)
+                except Exception as e:
+                    logger.debug(f"Could not fetch user {user_id}: {e}")
+                    user = None
         
         # Fetch user profile context for personalization
         user_profile = None
@@ -140,16 +144,17 @@ def chat(request):
         )
         
         # Always persist to database so the first-interaction signal fires
+        resolved_user_id = str(user.id) if user else None
         try:
             if session_id:
                 try:
                     session = ChatSession.objects.get(id=session_id)
                 except ChatSession.DoesNotExist:
                     logger.warning(f"ChatSession {session_id} not found, creating new session")
-                    session = ChatSession.objects.create(user_id=user_id)
+                    session = ChatSession.objects.create(user_id=resolved_user_id)
                     session_id = session.id
             else:
-                session = ChatSession.objects.create(user_id=user_id)
+                session = ChatSession.objects.create(user_id=resolved_user_id)
                 session_id = session.id
 
             ChatMessage.objects.create(
