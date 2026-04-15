@@ -7,6 +7,7 @@ This is the only class that API views should call.
 import os
 import re
 import random
+import logging
 import difflib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -27,6 +28,9 @@ from jema.src.language_detector import LanguageDetector
 
 # Services imports
 from jema.services.llm_service import LLMService
+from jema.services.profile_context import ProfileContext, ProfileMissingError
+
+logger = logging.getLogger(__name__)
 
 
 # Common African recipes fallback (when not in database) - diverse cuisines from across Africa
@@ -321,6 +325,7 @@ class JemaEngine:
         # Load user profile context for personalization
         self.user = user
         self.user_profile = self._load_user_profile(user) if user else None
+        self.current_ctx: Optional[ProfileContext] = None  # Per-request ProfileContext
         
         # Conversation state
         self.last_suggested_recipes: List[Dict] = []
@@ -333,100 +338,6 @@ class JemaEngine:
         
         # Regional diversity tracking (prevent repetition from same region)
         self.suggested_regions: List[str] = []  # Track regions of suggested recipes in this session
-
-    def _filter_csv_by_profile(self, df: pd.DataFrame, user_profile: dict = None) -> pd.DataFrame:
-        """
-        Filter DataFrame to exclude recipes that violate user dietary restrictions.
-        This is called FIRST before any recipe selection to prevent unsafe suggestions.
-        
-        Handles:
-        - Vegan/vegetarian diets (excludes all meat, fish, dairy, eggs, honey)
-        - Muslim/halal (excludes pork, alcohol)
-        - Hindu (excludes beef)
-        - Allergies (nuts, dairy, gluten)
-        - Dislikes
-        
-        Args:
-            df: DataFrame to filter (typically self.recipes_df)
-            user_profile: Dict with keys: diet, allergies, religion, dislikes, medical_conditions
-            
-        Returns:
-            Filtered DataFrame. Returns original if no profile provided or no safe recipes found.
-        """
-        if not user_profile or df.empty:
-            return df
-        
-        filtered = df.copy()
-        diet = str(user_profile.get("diet", "")).lower().strip()
-        allergies = user_profile.get("allergies") or []
-        if isinstance(allergies, str):
-            allergies = [allergies]
-        allergies = [a.lower().strip() for a in allergies]
-        
-        dislikes = user_profile.get("dislikes") or []
-        if isinstance(dislikes, str):
-            dislikes = [dislikes]
-        dislikes = [d.lower().strip() for d in dislikes]
-        
-        religion = str(user_profile.get("religion", "")).lower().strip()
-
-        # Build forbidden ingredient list from profile
-        forbidden = set()
-        
-        # Diet-based restrictions
-        if diet in ("vegan", "vegetarian", "hindu_vegetarian"):
-            forbidden.update(["chicken", "beef", "lamb", "mutton", "pork", "fish", "prawn", "shrimp",
-                              "meat", "bacon", "lard", "gelatin"])
-        if diet == "vegan":
-            forbidden.update(["dairy", "milk", "cheese", "butter", "cream", "ghee", "yogurt", "honey", "egg", "eggs"])
-        elif diet == "vegetarian":
-            forbidden.update(["dairy", "milk", "cheese", "butter", "cream", "ghee", "yogurt"])
-        
-        # Religion-based restrictions
-        if "muslim" in religion or "halal" in religion:
-            forbidden.update(["pork", "bacon", "ham", "lard", "alcohol", "wine", "beer", "spirits"])
-        if "hindu" in religion:
-            forbidden.update(["beef", "veal"])
-        
-        # Allergy-based restrictions
-        for allergy in allergies:
-            if "nut" in allergy.lower():
-                forbidden.update(["almond", "almonds", "cashew", "cashews", "peanut", "peanuts",
-                                  "walnut", "walnuts", "pistachio", "pistachios", "hazelnut",
-                                  "hazelnuts", "pecan", "pecans", "nut", "nuts", "groundnut", "groundnuts"])
-            elif "dairy" in allergy.lower():
-                forbidden.update(["milk", "cheese", "butter", "cream", "yogurt", "ghee", "lactose", "dairy"])
-            elif "gluten" in allergy.lower():
-                forbidden.update(["wheat", "flour", "bread", "pasta", "barley", "rye", "semolina", "gluten"])
-            elif "egg" in allergy.lower():
-                forbidden.update(["egg", "eggs", "eggs"])
-        
-        # Add user dislikes
-        forbidden.update(dislikes)
-        
-        # Filter rows: exclude if core_ingredients contains any forbidden item
-        def row_is_safe(row):
-            ingredients_raw = str(row.get("core_ingredients", "")).lower()
-            for item in forbidden:
-                if re.search(r'\b' + re.escape(item) + r'\b', ingredients_raw):
-                    return False
-            return True
-        
-        safe_mask = filtered.apply(row_is_safe, axis=1)
-        filtered = filtered[safe_mask]
-        
-        # If filtering leaves fewer than 3 rows, apply a partial filter
-        # (only enforce religion + allergies, drop dislikes)
-        if len(filtered) < 3:
-            partial_forbidden = forbidden - set(dislikes)
-            safe_mask2 = df.apply(lambda row: all(
-                not re.search(r'\b' + re.escape(item) + r'\b', str(row.get("core_ingredients", "")).lower())
-                for item in partial_forbidden
-            ), axis=1)
-            filtered = df[safe_mask2]
-        
-        # Last resort: return original df rather than empty
-        return filtered if len(filtered) > 0 else df
 
     def _lookup_csv_recipe(self, recipe_name: str, df: pd.DataFrame = None) -> Optional[Dict]:
         """
@@ -533,8 +444,11 @@ class JemaEngine:
         
         IMPORTANT: Now applies user_profile filtering FIRST before search.
         """
-        # FILTER 1: Apply dietary profile restrictions FIRST
-        safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+        # Apply dietary profile restrictions
+        if self.current_ctx:
+            safe_df = self.current_ctx.filter_csv(self.recipes_df)
+        else:
+            safe_df = self.recipes_df
         
         ingredient_lower = ingredient.strip().lower()
         matches = []
@@ -633,13 +547,14 @@ class JemaEngine:
         # Return as newline-separated lines (Groq will see each as a step to title and number)
         return "\n".join(cleaned_sentences)
 
-    def process_message(self, user_input: str, user_profile: dict = None) -> Dict:
+    def process_message(self, user_input: str, user_profile: dict = None, ctx: ProfileContext = None) -> Dict:
         """
         Process a user message and return a response.
         
         Args:
             user_input: User's natural language input
-            user_profile: Optional dict with user personalisation data (diet, allergies, medical conditions, etc.)
+            user_profile: (Deprecated) Optional dict with user personalisation data. Use ctx instead.
+            ctx: Optional ProfileContext instance. If not provided, will be created from user_profile.
         
         Returns:
             Dictionary with:
@@ -650,6 +565,19 @@ class JemaEngine:
                 - state: Dict (current conversation state for debugging)
         """
         user_input = user_input.strip()
+        
+        # Build ProfileContext if not provided — supports both old callers (passing dict) and new callers (passing ctx)
+        if ctx is None and user_profile is not None:
+            try:
+                ctx = ProfileContext(user_profile)
+            except ProfileMissingError:
+                ctx = None  # Allow graceful degradation if profile is invalid
+        
+        if ctx is not None:
+            logger.debug(f"[JemaEngine] process_message() called with ProfileContext — diet={ctx.diet}, religion={ctx.religion}, allergies={ctx.allergies}")
+        
+        # Store ctx as instance variable for handlers to access
+        self.current_ctx = ctx
         
         # Handle reset commands
         if user_input.lower() in ["clear", "reset", "new conversation"]:
@@ -725,8 +653,12 @@ class JemaEngine:
         """Handle requests for specific community/ethnic cuisines."""
         community_matcher = self.matcher.filter_by_community(community).exclude_beverages()
         
-        # FILTER 1: Apply dietary profile restrictions FIRST
-        safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+        # Apply dietary profile restrictions
+        if self.current_ctx:
+            safe_df = self.current_ctx.filter_csv(self.recipes_df)
+            logger.debug(f"[JemaEngine] CSV filtered — {len(safe_df)} safe rows available for selection")
+        else:
+            safe_df = self.recipes_df
         
         all_community_recipes = safe_df[
             safe_df['community'].str.lower() == community.lower()
@@ -771,10 +703,11 @@ class JemaEngine:
                 f"User said: '{user_input}' (they're working on {self.current_recipe.get('meal_name', 'a recipe')})",
                 use_history=False,
                 include_cta=False,
-                user_profile=user_profile
+                user_profile=user_profile,
+                ctx=self.current_ctx
             )
         elif len(self.llm.conversation_history) > 0:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
+            response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
         else:
             if self.llm.current_language == 'swahili':
                 response = "Habari! Mimi ni Jema. Niambie viungo unavyonazo au chakula unachotaka!"
@@ -794,8 +727,11 @@ class JemaEngine:
         if self.last_suggested_recipes:
             self.rejected_recipes.extend([r.get('meal_name', '') for r in self.last_suggested_recipes[:1]])
             
-            # FILTER 1: Apply dietary profile restrictions FIRST
-            safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+            # Apply dietary profile restrictions
+            if self.current_ctx:
+                safe_df = self.current_ctx.filter_csv(self.recipes_df)
+            else:
+                safe_df = self.recipes_df
             
             # Find alternatives
             alternatives = []
@@ -824,7 +760,7 @@ class JemaEngine:
                 return self._build_response(message, self.last_suggested_recipes)
         
         # Fallback
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
@@ -832,7 +768,7 @@ class JemaEngine:
 
     def _handle_accompaniment(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle accompaniment queries (what goes with X?)."""
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
@@ -845,10 +781,11 @@ class JemaEngine:
                 f"{user_input} (Answer in context of {self.current_recipe.get('meal_name', 'this recipe')})",
                 use_history=False,
                 include_cta=False,
-                user_profile=user_profile
+                user_profile=user_profile,
+                ctx=self.current_ctx
             )
         else:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
+            response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
         
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
@@ -921,6 +858,7 @@ class JemaEngine:
         
         # Extract quantity requested (e.g., "3 meals", "suggest 3", "two recipes")
         quantity = self._extract_quantity(user_input)
+        logger.debug(f"[JemaEngine] Quantity extracted: {quantity} from message: '{user_input[:60]}'")
         
         time_context = f" for {meal_time}" if meal_time else ""
         
@@ -929,7 +867,7 @@ class JemaEngine:
             # Generate suggestions in a structured way, one per numbered item
             prompt = f"Suggest {quantity} delicious traditional African recipes{time_context} from across the continent. Return ONLY a numbered list (1. 2. 3. etc) with the dish name and a brief one-line description. No additional text."
             
-            raw_response = self.llm.general_response(prompt, use_history=False, include_cta=False, user_profile=user_profile)
+            raw_response = self.llm.general_response(prompt, use_history=False, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
             
             # Parse the response into individual suggestions
             # Split by lines and extract numbered items
@@ -955,7 +893,7 @@ class JemaEngine:
         else:
             # Single suggestion — use conversational prompt
             prompt = f"Suggest a delicious traditional African recipe{time_context} from across the continent. Include the dish name and a brief description of why it's great. Keep it conversational and appetizing."
-            response = self.llm.general_response(prompt, use_history=False, include_cta=False, user_profile=user_profile)
+            response = self.llm.general_response(prompt, use_history=False, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
         
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
@@ -964,8 +902,12 @@ class JemaEngine:
 
     def _handle_information(self, user_input: str, user_profile: dict = None) -> Dict:
         """Handle information/social chat."""
-        # Filter DataFrame by profile first
-        safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+        # Apply dietary profile restrictions
+        if self.current_ctx:
+            safe_df = self.current_ctx.filter_csv(self.recipes_df)
+            logger.debug(f"[JemaEngine] CSV filtered — {len(safe_df)} safe rows available for selection")
+        else:
+            safe_df = self.recipes_df
         
         # Check if this might be a recipe request that wasn't caught by RECIPE_REQUEST intent
         recipe_name = self._extract_recipe_name(user_input, df=safe_df)
@@ -973,7 +915,7 @@ class JemaEngine:
             # Route to recipe handler
             return self._handle_recipe_request(user_input, user_profile)
         
-        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile)
+        response = self.llm.general_response(user_input, use_history=True, include_cta=False, user_profile=user_profile, ctx=self.current_ctx)
         self.llm.add_to_history("user", user_input)
         self.llm.add_to_history("assistant", response)
         
@@ -1049,15 +991,19 @@ class JemaEngine:
         3. Tavily web search
         4. Groq generation (constrained)
         """
-        # CRITICAL: Filter DataFrame by profile FIRST to prevent serving unsafe recipes
-        safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+        # Apply dietary profile restrictions
+        if self.current_ctx:
+            safe_df = self.current_ctx.filter_csv(self.recipes_df)
+            logger.debug(f"[JemaEngine] CSV filtered — {len(safe_df)} safe rows available for selection")
+        else:
+            safe_df = self.recipes_df
         
         # Extract recipe name from the request
         recipe_name = self._extract_recipe_name(user_input, df=safe_df)
 
         if not recipe_name:
             response = self.llm.general_response(
-                user_input, use_history=True, include_cta=True
+                user_input, use_history=True, include_cta=True, ctx=self.current_ctx
             )
             self.llm.add_to_history("user", user_input)
             self.llm.add_to_history("assistant", response)
@@ -1182,14 +1128,18 @@ class JemaEngine:
 
     def _handle_ingredient_based(self, user_input: str, constraints: List, user_profile: dict = None) -> Dict:
         """Handle ingredient-based recipe matching across African cuisines with deduplication."""
-        # FILTER 1: Apply dietary profile restrictions FIRST (before any CSV search)
-        safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+        # Apply dietary profile restrictions
+        if self.current_ctx:
+            safe_df = self.current_ctx.filter_csv(self.recipes_df)
+            logger.debug(f"[JemaEngine] CSV filtered — {len(safe_df)} safe rows available for selection")
+        else:
+            safe_df = self.recipes_df
         
         # Extract ingredients
         user_ingredients = IngredientNormalizer.extract_from_string(user_input)
         
         if not user_ingredients:
-            response = self.llm.general_response(user_input, use_history=True, include_cta=False)
+            response = self.llm.general_response(user_input, use_history=True, include_cta=False, ctx=self.current_ctx)
             self.llm.add_to_history("user", user_input)
             self.llm.add_to_history("assistant", response)
             return self._build_response(response, [])
@@ -1485,8 +1435,11 @@ class JemaEngine:
 
     def _handle_no_matches(self, user_ingredients: set, matcher, user_constraints: Dict, user_input: str, user_profile: dict = None) -> Dict:
         """Handle when no recipes match user ingredients."""
-        # Filter DataFrame by profile first
-        safe_df = self._filter_csv_by_profile(self.recipes_df, user_profile)
+        # Apply dietary profile restrictions
+        if self.current_ctx:
+            safe_df = self.current_ctx.filter_csv(self.recipes_df)
+        else:
+            safe_df = self.recipes_df
         
         # First, check common recipes fallback
         common_matches = self._match_common_recipes(user_ingredients)

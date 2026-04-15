@@ -22,6 +22,7 @@ Commands in the CLI:
 import sys
 import os
 import re
+import logging
 from pathlib import Path
 from typing import Dict, Optional, List
 
@@ -29,11 +30,20 @@ from typing import Dict, Optional, List
 JEMA_DIR = Path(__file__).parent
 sys.path.insert(0, str(JEMA_DIR.parent))
 
+# Setup logging — check for debug mode
+DEBUG_PIPELINE = os.getenv("JEMA_DEBUG", "0") == "1"
+if DEBUG_PIPELINE:
+    logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+    print("🔍 Pipeline debug mode ON — full data flow trace enabled\n")
+else:
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+
 # Import the main engine
 try:
     from jema.services.jema_engine import JemaEngine
+    from jema.services.profile_context import ProfileContext, ProfileMissingError
 except ImportError as e:
-    print(f"❌ Error importing JemaEngine: {e}")
+    print(f"❌ Error importing JemaEngine or ProfileContext: {e}")
     print(f"   Make sure you're running from the correct directory.")
     print(f"   Current directory: {os.getcwd()}")
     sys.exit(1)
@@ -711,19 +721,24 @@ EXAMPLE INPUTS:
             return
         
         try:
-            # PERSONALISATION: Pass active profile to engine
-            response = self.engine.process_message(user_input, user_profile=self.active_profile)
+            # Build ProfileContext from active profile if available
+            ctx = None
+            if self.active_profile:
+                try:
+                    ctx = ProfileContext(self.active_profile)
+                    print(f"[ProfileContext] Active — diet={ctx.diet}, religion={ctx.religion}, forbidden={len(ctx.forbidden)} tokens")
+                except ProfileMissingError as e:
+                    print(f"❌ Profile error: {e}")
+                    return
+            
+            # Process message with ProfileContext
+            response = self.engine.process_message(user_input, ctx=ctx)
             
             # Store in chat history
             self.chat_history.append({"user": user_input, "jema": response})
             
             # Print response
             self._print_response(response)
-            
-            # PERSONALISATION: Validate response against profile restrictions
-            if self.active_profile:
-                response_text = response.get("response", "")
-                validate_response(response_text, self.active_profile)
         
         except Exception as e:
             print(f"\n❌ Error processing message: {e}")
