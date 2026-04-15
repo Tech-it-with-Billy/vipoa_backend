@@ -220,5 +220,63 @@ class JemaHealthTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('status', response.data)
 
+    
+    def test_session_state_isolation(self):
+        """
+        Test that sessions maintain isolated state and don't leak between requests.
+        
+        This verifies the fix for the "I didn't catch that" loop bug where stale state
+        from Session A would pollute Session B's responses.
+        
+        Scenario:
+        - Session 1: User makes ingredient-based recipe request
+        - Session 2: Different user greets the bot
+        - Verify: Session 2 doesn't get Session 1's error message with wrong recipes
+        """
+        # Create two sessions
+        session1 = ChatSession.objects.create(user_id='user_1')
+        session2 = ChatSession.objects.create(user_id='user_2')
+        
+        # Session 1: Request recipes (triggers awaiting_recipe_choice state)
+        response1 = self.client.post(
+            self.chat_url,
+            {
+                'message': 'I have rice and beef. What can I make?',
+                'session_id': session1.id
+            },
+            format='json'
+        )
+        self.assertEqual(response1.status_code, status.HTTP_200_OK)
+        message1 = response1.data.get('message', '').lower()
+        # Session 1 should get recipe suggestions
+        self.assertTrue(
+            'rice' in message1 or 'beef' in message1 or 'recipe' in message1,
+            f"Session 1 should receive recipes, got: {message1}"
+        )
+        
+        # Session 2: Send a greeting (should NOT get Session 1's error loop)
+        response2 = self.client.post(
+            self.chat_url,
+            {
+                'message': 'Hello, can you help me cook?',
+                'session_id': session2.id
+            },
+            format='json'
+        )
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+        message2 = response2.data.get('message', '').lower()
+        
+        # Session 2 should NOT get "I didn't catch that. Please choose from:" error
+        self.assertNotIn(
+            "i didn't catch that",
+            message2,
+            f"Session 2 got stale state error! Message: {message2}"
+        )
+        self.assertNotIn(
+            "please choose from",
+            message2,
+            f"Session 2 showing wrong recipe list! Message: {message2}"
+        )
+
 
 # Run tests with: python manage.py test jema.tests

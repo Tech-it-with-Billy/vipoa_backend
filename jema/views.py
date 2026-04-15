@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from jema.models import ChatSession, ChatMessage
 from jema.serializers import ChatSessionSerializer, ChatMessageSerializer
 from jema.services.jema_engine import JemaEngine
+from jema.services.profile_context import ProfileContext, ProfileMissingError
 from jema.services.jema_modelling import (
     run_jema_model,
     answer_with_rag,
@@ -163,13 +164,30 @@ def chat(request):
                 logger.exception("Failed to create session for user_id=%s", getattr(user, 'id', None))
                 session = None
 
-        # Always use the global engine for processing.
-        # Per-session state isolation is handled via persisted ChatMessages;
-        # spinning up a new JemaEngine per request is too expensive.
-        engine = get_engine()
+        # Use session-specific engine for proper state isolation across requests.
+        # Each session gets its own JemaEngine instance to prevent state pollution
+        # from concurrent/sequential requests (different users or same user in diff sessions).
+        if session:
+            engine = get_session_engine(session.id, user=user)
+        else:
+            # Fallback to global engine only for truly sessionless requests
+            engine = get_engine()
+        
+        # Build ProfileContext if user is available
+        ctx = None
+        if user:
+            try:
+                from profiles.services import get_user_profile_context
+                user_profile = get_user_profile_context(user)
+                if user_profile:
+                    ctx = ProfileContext(user_profile)
+            except ProfileMissingError as e:
+                logger.warning(f"[ProfileContext] Profile error for user {user.id}: {e}")
+            except Exception as e:
+                logger.debug(f"[ProfileContext] Could not load profile for user {user.id}: {e}")
         
         # Process message
-        response = engine.process_message(user_message)
+        response = engine.process_message(user_message, ctx=ctx)
 
         # Award first Jema interaction directly from the endpoint.
         # This is idempotent via rewards reference_key and ensures points can
