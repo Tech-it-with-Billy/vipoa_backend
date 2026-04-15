@@ -16,7 +16,6 @@ from rest_framework.response import Response
 from jema.models import ChatSession, ChatMessage
 from jema.serializers import ChatSessionSerializer, ChatMessageSerializer
 from jema.services.jema_engine import JemaEngine
-from jema.services.profile_context import ProfileContext, ProfileMissingError
 from jema.services.jema_modelling import (
     run_jema_model,
     answer_with_rag,
@@ -169,21 +168,8 @@ def chat(request):
         # spinning up a new JemaEngine per request is too expensive.
         engine = get_engine()
         
-        # Build ProfileContext if user is available
-        ctx = None
-        if user:
-            try:
-                from profiles.services import get_user_profile_context
-                user_profile = get_user_profile_context(user)
-                if user_profile:
-                    ctx = ProfileContext(user_profile)
-            except ProfileMissingError as e:
-                logger.warning(f"[ProfileContext] Profile error for user {user.id}: {e}")
-            except Exception as e:
-                logger.debug(f"[ProfileContext] Could not load profile for user {user.id}: {e}")
-        
         # Process message
-        response = engine.process_message(user_message, ctx=ctx)
+        response = engine.process_message(user_message)
 
         # Award first Jema interaction directly from the endpoint.
         # This is idempotent via rewards reference_key and ensures points can
